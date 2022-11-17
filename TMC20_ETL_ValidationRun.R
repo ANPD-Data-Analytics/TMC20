@@ -1,5 +1,5 @@
 require(renv)
-renv::restore()
+renv::restore(confirm = FALSE)
 #renv::snapshot()
 
 ValidationOnly <- 1
