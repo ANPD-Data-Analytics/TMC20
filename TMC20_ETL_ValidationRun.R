@@ -19,6 +19,7 @@ tryCatch( {
   require(tictoc)
   require(openxlsx)
   require(rmarkdown)
+  require(markdown)
   require(htmltools)
   require(flexdashboard)
   require(DT)
