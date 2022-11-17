@@ -40,7 +40,7 @@ tryCatch( {
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ####
 # Source GIT connections & functions ####
 require(devtools)
-install_github("ANPD-Data-Analytics/Connections")
+install_github("ANPD-Data-Analytics/Connections",force = TRUE)
 install_github("ANPD-Data-Analytics/CommonFunctions")
 library(Connections)
 library(CommonFunctions)
