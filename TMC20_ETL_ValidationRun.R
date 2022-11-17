@@ -1,3 +1,7 @@
+require(renv)
+renv::restore()
+#renv::snapshot()
+
 ValidationOnly <- 1
 
 # Start tryCatch ####  
@@ -28,17 +32,10 @@ tryCatch( {
   require(readtext)
   require(mailR)
   require(htmlTable)
-  #require(olapR)
   require(AzureRMR)
   require(AzureStor)
   require(lubridate)
   require(dplyr)
-  # install.packages("olapR")
-  # install.packages("rpivotTable")
-  # install.packages("kableExtra")
-  # install.packages("AzureRMR") 
-  # install.packages("rlist")
-  # install.packages("AzureStor")
   
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ####
 # Source GIT connections & functions ####
