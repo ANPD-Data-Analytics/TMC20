@@ -70,32 +70,6 @@
         "xml2"
       ]
     },
-    "CommonFunctions": {
-      "Package": "CommonFunctions",
-      "Version": "0.1.0",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteRepo": "CommonFunctions",
-      "RemoteUsername": "ANPD-Data-Analytics",
-      "RemoteRef": "HEAD",
-      "RemoteSha": "d86b1d899c131a0c1ec4d6fd85d8b6d91be442b1",
-      "Hash": "10156c96d9cafeb62fb869695a6e44b3",
-      "Requirements": []
-    },
-    "Connections": {
-      "Package": "Connections",
-      "Version": "0.1.0",
-      "Source": "GitHub",
-      "RemoteType": "github",
-      "RemoteHost": "api.github.com",
-      "RemoteRepo": "Connections",
-      "RemoteUsername": "ANPD-Data-Analytics",
-      "RemoteRef": "HEAD",
-      "RemoteSha": "262374a2787ceda5e8f309acfab3299e7b429ec8",
-      "Hash": "4b778c124d54c9a4a52186defc1c1958",
-      "Requirements": []
-    },
     "DBI": {
       "Package": "DBI",
       "Version": "1.1.2",
