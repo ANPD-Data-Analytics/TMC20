@@ -1,4 +1,11 @@
 ## Publish Retailer Data & TMC ####
+sysUser511 <- Sys.getenv("username")
+
+# Define Directories ####
+directoryLoc <- "//fcrpdfile02/WRKStApps1$/Retail Sales/Retail Reports/TMC20/"
+SQLdirectoryMainLoc <- paste0(directoryLoc,"SQL_Queries/")
+CSV_XLdirectoryLoc <- paste0(directoryLoc,"CSV_XL_Files/")
+RScriptdirectoryLoc <- paste0(directoryLoc,"R_Scripts/")
 
 # Run Step #3 SQL Publish to Prod Updates ####
 #Step3_TMC_PUBLISH_TO_PROD <- readtext(paste0(WeeklyRefresh, "Step#3_TMC_PUBLISH_TO_PROD.txt"))$text
