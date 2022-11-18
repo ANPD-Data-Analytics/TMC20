@@ -1046,7 +1046,7 @@ for (Segment in Segments) {
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ####
 # Run TMC20Plan.R ####
 Message2Log("Running TMC20Plan.R - Updating Plan")
-#source(paste0(RScriptdirectoryLoc,"TMC20Plan.R"))
+source(paste0(RScriptdirectoryLoc,"TMC20Plan.R"))
 
 KeepObjects <- get.objects()
 Cleanup <- data.frame(get.objects(paste0(RScriptdirectoryLoc,"TMC20Plan.R"),exception = KeepObjects))
