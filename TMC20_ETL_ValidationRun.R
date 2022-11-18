@@ -2,7 +2,7 @@ require(renv)
 renv::restore(confirm = FALSE)
 #renv::snapshot()
 
-ValidationOnly <- 1
+ValidationOnly <- 0
 
 # Start tryCatch ####  
 tryCatch( {
