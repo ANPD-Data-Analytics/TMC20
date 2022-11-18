@@ -1,4 +1,18 @@
 ## Publish Retailer Data & TMC ####
+require(odbc)
+require(readxl)
+require(tidyverse)
+require(stringr)
+require(lubridate)
+require(olapR)
+require(readtext)
+require(data.table)
+require(tictoc)
+require(openxlsx)
+require(DT)
+require(plotly)
+require(htmltools)
+require(rlist)
 sysUser511 <- Sys.getenv("username")
 
 # Define Directories ####
