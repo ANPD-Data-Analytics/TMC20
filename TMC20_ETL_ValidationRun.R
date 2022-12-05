@@ -1053,6 +1053,37 @@ Cleanup <- data.frame(get.objects(paste0(RScriptdirectoryLoc,"TMC20Plan.R"),exce
 rm(list = Cleanup[1:nrow(Cleanup),1])
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ####
+#Refresh TMC Test PBi ####
+directoryLoc_1 <- paste0("C:/Users/",
+                         sysUser511,
+                         "/OneDrive - Abbott/TMC Test/")
+
+if(file.exists(paste0(directoryLoc_1, "TestCompleted.xlsx"))){
+  TestCompleted <- read_excel(paste0(directoryLoc_1, "TestCompleted.xlsx")) %>% 
+    mutate(`Test_Complete` = as.POSIXct(`Test_Complete`))
+}else{
+  directoryLoc_1 <- paste0("C:/Users/",
+                           username,
+                           "/OneDrive - Abbott/Documents - NA-ANPD-MIDATA/TMC Test/")
+  TestCompleted <- read_excel(paste0(directoryLoc_1, "TestCompleted.xlsx")) %>% 
+    mutate(`Test_Complete` = as.POSIXct(`Test_Complete`))
+}
+
+
+#append latest timestamp
+curtime <- tibble(Test_Complete = Sys.time())
+TestCompleted <- bind_rows(TestCompleted, curtime)
+
+#write file
+wb <- openxlsx::createWorkbook()
+openxlsx::addWorksheet(wb, "Sheet1")
+openxlsx::writeData(wb,
+                    sheet = "Sheet1",
+                    as.data.frame(TestCompleted),
+                    rowNames = FALSE)
+openxlsx::saveWorkbook(wb, file = paste0(directoryLoc_1,"TestCompleted.xlsx"), overwrite = TRUE)
+
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ####
 # Record End Time ####
 Endtime <- Sys.time()
 RunTime <- as.character(paste0("Script Ran for ",(round(difftime(Endtime, Starttime, units = "mins"),digits = 0))," Minutes."))
