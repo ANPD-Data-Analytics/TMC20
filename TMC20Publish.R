@@ -13,7 +13,18 @@ require(DT)
 require(plotly)
 require(htmltools)
 require(rlist)
-sysUser511 <- Sys.getenv("username")
+require(mailR)
+
+# Source GIT connections & functions ####
+require(devtools)
+install_github("ANPD-Data-Analytics/Connections",force = TRUE)
+install_github("ANPD-Data-Analytics/CommonFunctions")
+library(Connections)
+library(CommonFunctions)
+sysUser511 <- Connections::sysUser511
+odbcConnStr <- Connections::odbcConnStr
+odbcConnStrBOA <- Connections::odbcConnStrBOA
+qryBOAExecute <- CommonFunctions::qryBOAExecute
 
 # Define Directories ####
 directoryLoc <- "//fcrpdfile02/WRKStApps1$/Retail Sales/Retail Reports/TMC20/"
