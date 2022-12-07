@@ -1,0 +1,9 @@
+Test consumption data LW: 2022-11-26. Prod consumption data LW: 2022-11-19.</br>  
+<span style="background-color:green; color:white;">PASSED</span>: Retailers are all in output, and the number of weeks per retailer match.</br>  
+<span style="background-color:green; color:white;">PASSED</span>: There are no items with sales and 0 EQ.</br>  
+<span style="background-color:green; color:white;">PASSED</span>: There are no duplicate UPCs in the Characteristics table.</br>  
+<span style="background-color:green; color:white;">PASSED</span>: There are no unmapped items in the Characteristics table.</br>  
+<span style="background-color:green; color:white;">PASSED</span>: No unknown EQ's for IFUA above 50K.</br>  
+<span style="background-color:green; color:white;">PASSED</span>: Variance of Connect data compared with Velocity within expected range.</br>  
+<span style="background-color:green; color:white;">PASSED</span>: Retail Extract Characteristics table Consumption_Nielsen_Char has all items.</br>  
+<span style="background-color:green; color:white;">PASSED</span>: IFUA Costco Competitive contains latest week.

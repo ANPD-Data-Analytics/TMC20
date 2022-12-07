@@ -1,0 +1,103 @@
+/*
+
+select * --4,092
+from AbbottSandbox.dbo.consumption_upc_asin
+--where asin is not null
+where upc = '002392310044'
+
+
+*/
+
+--Step 1============================ upc-to-asin ==============================================
+
+SELECT IT.NIELSEN_UPC as UPC,
+       CI.CUST_ITEM_NBR as asin
+FROM AbbottSandbox.dbo.vvCustomerItem CI
+     ,AbbottSandbox.dbo.vvItem IT
+WHERE IT.IDX_ITEM = CI.IDX_ITEM
+        and IT.NIELSEN_SEGMENT IN ('BALANCED NUTRITION', 'DIABETES NUTRITION', 'TODDLER NUTRITION', 'ORAL ELECTROLYTES', 
+                                'INFANT FORMULA UA', 'IFUA', 'BN', 'DN', 'OES', 'TN')
+        --UPC-to-ASIN mapping by definition
+            and IT.NIELSEN_UPC <> '000000000000'
+            and CI.CUST_ITEM_NBR like 'B%'    
+  --and CI.CUST_ITEM_NBR IN ('B0007XXPO8', 'B00IB0Y7AK') --test
+
+    union 
+
+--Step 2=================== asin-to-asin ====================================================
+
+SELECT ASIN as UPC, ASIN2 as asin
+FROM 
+(
+SELECT CI.CUST_ITEM_NBR as ASIN, IT.NIELSEN_UPC
+FROM AbbottSandbox.dbo.vvCustomerItem CI
+     ,AbbottSandbox.dbo.vvItem IT
+WHERE IT.IDX_ITEM = CI.IDX_ITEM
+        and IT.NIELSEN_SEGMENT IN ('BALANCED NUTRITION', 'DIABETES NUTRITION', 'TODDLER NUTRITION', 'ORAL ELECTROLYTES', 
+                                'INFANT FORMULA UA', 'IFUA', 'BN', 'DN', 'OES', 'TN')
+        and IT.NIELSEN_UPC <> '000000000000'
+        and CI.CUST_ITEM_NBR like 'B%'
+) as A
+
+full join (SELECT CI.CUST_ITEM_NBR as ASIN2, IT.NIELSEN_UPC
+        FROM AbbottSandbox.dbo.vvCustomerItem CI
+             ,AbbottSandbox.dbo.vvItem IT
+        WHERE IT.IDX_ITEM = CI.IDX_ITEM
+            --Remaining UPCs per Segment by definition
+                and IT.NIELSEN_SEGMENT IN ('BALANCED NUTRITION', 'DIABETES NUTRITION', 'TODDLER NUTRITION', 'ORAL ELECTROLYTES', 
+                                        'INFANT FORMULA UA', 'IFUA', 'BN', 'DN', 'OES', 'TN')
+                and IT.NIELSEN_UPC <> '000000000000'
+                and CI.CUST_ITEM_NBR like 'B%'
+     ) as B
+
+        on A.NIELSEN_UPC = B.NIELSEN_UPC
+        and (A.ASIN <> B.ASIN2 or A.ASIN = B.ASIN2) --use cartesian product to create asin-to-itself and other asins   
+--WHERE A.ASIN IN ('B0007XXPO8', 'B00IB0Y7AK') --test
+
+    union
+
+--Step 3===================== upc but no asin=========================================================
+
+SELECT IT.NIELSEN_UPC as UPC,
+       CI.CUST_ITEM_NBR as asin
+FROM AbbottSandbox.dbo.vvCustomerItem CI
+     ,AbbottSandbox.dbo.vvItem IT
+WHERE IT.IDX_ITEM = CI.IDX_ITEM
+    --Remaining UPCs per Segment by definition
+        and IT.NIELSEN_SEGMENT IN ('BALANCED NUTRITION', 'DIABETES NUTRITION', 'TODDLER NUTRITION', 'ORAL ELECTROLYTES', 
+                                'INFANT FORMULA UA', 'IFUA', 'BN', 'DN', 'OES', 'TN')
+        and IT.NIELSEN_UPC <> '000000000000'
+        and CI.CUST_ITEM_NBR is null
+  --and IT.NIELSEN_UPC = '030087121441' --test
+        and IT.NIELSEN_UPC NOT IN (SELECT IT.NIELSEN_UPC as UPC --has an ASIN mapping
+                            FROM AbbottSandbox.dbo.vvCustomerItem CI
+                                 ,AbbottSandbox.dbo.vvItem IT
+                            WHERE IT.IDX_ITEM = CI.IDX_ITEM
+                                --Remaining UPCs per Segment by definition
+                                    and IT.NIELSEN_SEGMENT IN ('BALANCED NUTRITION', 'DIABETES NUTRITION', 'TODDLER NUTRITION', 'ORAL ELECTROLYTES', 
+                                                            'INFANT FORMULA UA', 'IFUA', 'BN', 'DN', 'OES', 'TN')
+                                    and IT.NIELSEN_UPC <> '000000000000'
+                                    and CI.CUST_ITEM_NBR like 'B%')
+
+
+
+
+
+
+   --examples
+        --and IT.NIELSEN_UPC = '007007455957' --mapped to 'B000AS1LIM'
+        --and IT.NIELSEN_UPC = '002392310044' --mapped to 'B001BM4JLC', 'B001OVSI26', 'B0032CJPOK', 'B01LS2DK8M' 
+        --and CI.CUST_ITEM_NBR IN ('B001BM4JLC', 'B001OVSI26', 'B0032CJPOK', 'B01LS2DK8M' )
+        --and IT.NIELSEN_UPC IN ('002392310044',  '007007455957') 
+        --and CI.CUST_ITEM_NBR IN ('B0007XXPO8', 'B00IB0Y7AK')
+
+
+/*
+
+select * 
+from AbbottSandbox.dbo.consumption_upc_asin
+where asin --like 'B%'--IN ('B001BM4JLC', 'B001OVSI26', 'B0032CJPOK', 'B01LS2DK8M' )
+IN ('B0007XXPO8', 'B00IB0Y7AK')
+--and upc like 'B%'
+
+*/

@@ -1,0 +1,316 @@
+---
+title: "TMC Validation Report"
+date: "`r format(Sys.time(), '%m/%d/%Y')`"
+output:
+  html_document:
+    df_print: paged
+    css: style.css
+params:
+  Segment: "INFANT FORMULA UA"
+---
+
+```{r setup, echo=FALSE, warnings=FALSE, include=FALSE}
+
+impactsummary <- impactsummaryfun(sharetemptot_out)
+impactsummary2021 <- impactsummaryfun(sharetemptot_out, '01/09/2021', '01/01/2022')
+impactsummary2022 <- impactsummaryfun(sharetemptot_out, '01/08/2022',
+                                      as.character(format(as.Date(maxWE),'%m/%d/%Y')))
+
+
+# Key item char changes ####
+Test_KeyChar <-
+  Test_Consumption_Char %>% select(
+    UPC,
+    "TEST_ABT_BRAND" = ABT_BRAND,
+    "TEST_ABT_SEGMENT" = ABT_SEGMENT,
+    "TEST_ABT_SIZE RANGE" = `ABT_SIZE RANGE`,
+    "TEST_TMC_ABBOTT_PRODUCT" = TMC_ABBOTT_PRODUCT,
+    "TEST_TMC_FORMULA_SEGMENT" = TMC_FORMULA_SEGMENT,
+    "TEST_TMC_INC_SHARE" = TMC_INC_SHARE,
+    "TEST_TMC_MANUFACTURER" = TMC_MANUFACTURER,
+    "TEST_TMC_SUBBRAND_CUSTOM" = TMC_SUBBRAND_CUSTOM,
+    "TEST_NIELSEN_ABT_NAT_ORG" = NIELSEN_ABT_NAT_ORG
+  )
+KeyChar <-
+  Consumption_Char %>% select(
+    UPC,
+    ABT_BRAND,
+    ABT_SEGMENT,
+    `ABT_SIZE RANGE`,
+    TMC_ABBOTT_PRODUCT,
+    TMC_FORMULA_SEGMENT,
+    TMC_INC_SHARE,
+    TMC_MANUFACTURER,
+    TMC_SUBBRAND_CUSTOM,
+    NIELSEN_ABT_NAT_ORG
+  )
+
+KeyItemDiff <- inner_join(Test_KeyChar, KeyChar) %>%
+  mutate(
+    "DIFF_ABT_BRAND" = if_else(`TEST_ABT_BRAND` == `ABT_BRAND`, TRUE, FALSE),
+    "DIFF_ABT_SEGMENT" = if_else(`TEST_ABT_SEGMENT` == `ABT_SEGMENT`, TRUE, FALSE),
+    "DIFF_ABT_SIZE RANGE" = if_else(`TEST_ABT_SIZE RANGE` == `ABT_SIZE RANGE`, TRUE, FALSE),
+    "DIFF_TMC_ABBOTT_PRODUCT" = if_else(`TEST_TMC_ABBOTT_PRODUCT` == `TMC_ABBOTT_PRODUCT`, TRUE, FALSE),
+    "DIFF_TMC_FORMULA_SEGMENT" = if_else(
+      `TEST_TMC_FORMULA_SEGMENT` == `TMC_FORMULA_SEGMENT`,
+      TRUE,
+      FALSE
+    ),
+    "DIFF_TMC_INC_SHARE" = if_else(`TEST_TMC_INC_SHARE` == `TMC_INC_SHARE`, TRUE, FALSE),
+    "DIFF_TMC_MANUFACTURER" = if_else(`TEST_TMC_MANUFACTURER` == `TMC_MANUFACTURER`, TRUE, FALSE),
+    "DIFF_TMC_SUBBRAND_CUSTOM" = if_else(
+      `TEST_TMC_SUBBRAND_CUSTOM` == `TMC_SUBBRAND_CUSTOM`,
+      TRUE,
+      FALSE
+    ),
+    "DIFF_NIELSEN_ABT_NAT_ORG" = if_else(`TEST_NIELSEN_ABT_NAT_ORG` == `NIELSEN_ABT_NAT_ORG`, TRUE, FALSE)
+  )
+KeyItemDiff <- KeyItemDiff %>% select(
+  UPC,
+  "TEST_ABT_BRAND",
+  "ABT_BRAND",
+  "DIFF_ABT_BRAND",
+  "TEST_ABT_SEGMENT",
+  "ABT_SEGMENT",
+  "DIFF_ABT_SEGMENT",
+  "TEST_ABT_SIZE RANGE",
+  "ABT_SIZE RANGE",
+  "DIFF_ABT_SIZE RANGE",
+  "TEST_TMC_ABBOTT_PRODUCT",
+  "TMC_ABBOTT_PRODUCT",
+  "DIFF_TMC_ABBOTT_PRODUCT",
+  "TEST_TMC_FORMULA_SEGMENT",
+  "TMC_FORMULA_SEGMENT",
+  "DIFF_TMC_FORMULA_SEGMENT",
+  "TEST_TMC_INC_SHARE",
+  "TMC_INC_SHARE",
+  "DIFF_TMC_INC_SHARE",
+  "TEST_TMC_MANUFACTURER",
+  "TMC_MANUFACTURER",
+  "DIFF_TMC_MANUFACTURER",
+  "TEST_TMC_SUBBRAND_CUSTOM",
+  "TMC_SUBBRAND_CUSTOM",
+  "DIFF_TMC_SUBBRAND_CUSTOM",
+  "TEST_NIELSEN_ABT_NAT_ORG",
+  "NIELSEN_ABT_NAT_ORG",
+  "DIFF_NIELSEN_ABT_NAT_ORG"
+) %>% filter(
+  `DIFF_ABT_BRAND` != TRUE |
+    `DIFF_ABT_SEGMENT` != TRUE |
+    `DIFF_ABT_SIZE RANGE` != TRUE |
+    `DIFF_TMC_ABBOTT_PRODUCT` != TRUE |
+    `DIFF_TMC_FORMULA_SEGMENT` != TRUE |
+    `DIFF_TMC_INC_SHARE` != TRUE |
+    `DIFF_TMC_MANUFACTURER` != TRUE |
+    `DIFF_TMC_SUBBRAND_CUSTOM` != TRUE|
+    `DIFF_NIELSEN_ABT_NAT_ORG` != TRUE
+)
+
+sharetemptotUPC_out1 <-
+    sharetemptotUPC_out %>% filter(NIELSEN_SEGMENT == params$Segment) 
+
+impactsummary2021 <- impactsummary2021 %>%
+  filter(NIELSEN_SEGMENT == params$Segment) %>%
+  mutate(
+    `$ % Change` = sprintf("%1.2f%%", `$ % Change`),
+    `$ % Tot Change` = sprintf("%1.2f%%", `$ % Tot Change`),
+    `EQ % Change` = sprintf("%1.2f%%", `EQ % Change`),
+    `EQ % Tot Change` = sprintf("%1.2f%%", `EQ % Tot Change`)
+  ) %>% 
+  select(
+    Manufacturer,
+    "$ MFR % Chg" = `$ % Change`,
+    "$ Total % Chg" = `$ % Tot Change`,
+    "$ Share Chg" = `$ Share Diff`,
+    "EQ MFR % Chg" = `EQ % Change`,
+    "EQ Total % Chg" = `EQ % Tot Change`,
+    "EQ Share Chg" = `EQ Share Diff`
+  )
+impactsummary2022 <- impactsummary2022 %>%
+  filter(NIELSEN_SEGMENT == params$Segment) %>%
+  mutate(
+    `$ % Change` = sprintf("%1.2f%%", `$ % Change`),
+    `$ % Tot Change` = sprintf("%1.2f%%", `$ % Tot Change`),
+    `EQ % Change` = sprintf("%1.2f%%", `EQ % Change`),
+    `EQ % Tot Change` = sprintf("%1.2f%%", `EQ % Tot Change`)
+  ) %>%
+  select(
+    Manufacturer,
+    "$ MFR % Chg" = `$ % Change`,
+    "$ Total % Chg" = `$ % Tot Change`,
+    "$ Share Chg" = `$ Share Diff`,
+    "EQ MFR % Chg" = `EQ % Change`,
+    "EQ Total % Chg" = `EQ % Tot Change`,
+    "EQ Share Chg" = `EQ Share Diff`
+  )
+
+KeyItemDiff1 <- KeyItemDiff %>% 
+  filter(TEST_ABT_SEGMENT == params$Segment) %>% 
+  mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+
+newTestUPCs1 <- newTestUPCs %>% 
+  filter(NIELSEN_SEGMENT == params$Segment) %>% 
+  mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+```
+
+## Restatement Summary for `r params$Segment`
+
+`r if(nrow(impactsummary2021)>0){"### 2021 Restatement"}`
+
+```{r restatement-summary1, echo=FALSE, warning=FALSE, message=FALSE}
+if(nrow(impactsummary2021)>0) {
+  knitr::kable(impactsummary2021,align=c(rep('c',times=ncol(impactsummary2021)))) %>%
+  kable_classic(html_font = "Cambria")
+}
+```
+
+`r if(nrow(impactsummary2022)>0){"### 2022 Restatement"}`
+
+```{r restatement-summary2, echo=FALSE, warning=FALSE, message=FALSE}
+if(nrow(impactsummary2022)>0) {
+  knitr::kable(impactsummary2022,align=c(rep('c',times=ncol(impactsummary2022)))) %>%
+  kable_classic(html_font = "Cambria")
+}
+```
+
+`r if(nrow(sharetemptotUPC_out1)>0){"### Restatement Retailer Details"}`
+
+```{r restatement-summary-1, echo=FALSE, warning=FALSE, message=FALSE}
+if(nrow(sharetemptotUPC_out1)>0) {
+  
+  sharetemptotUPC_out2 <- sharetemptotUPC_out1 %>%
+    left_join(., Calendar) %>%
+    mutate(Year = as.character(Year)) %>%
+    select(Year,
+           Manufacturer,
+           `Market Description`,
+           `$`,
+           `$ Diff`,
+           `EQ`,
+           `EQ Diff`) %>%
+    group_by(Year, Manufacturer, `Market Description`) %>%
+    SumAll(.) %>%
+    filter(`$ Diff` != 0 | `EQ Diff` != 0) %>%
+    mutate(`$` = scales::dollar(`$`),
+           `$ Diff` = scales::dollar(`$ Diff`)) %>% 
+    arrange(Year, `Market Description`, Manufacturer)
+
+  if(nrow(sharetemptotUPC_out2)>0){
+    sharetemptotUPC_out2 <-
+    sharetemptotUPC_out2 %>% mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+  knitr::kable(sharetemptotUPC_out2,align=c(rep('c',times=ncol(sharetemptotUPC_out2)))) %>%
+  kable_classic(html_font = "Cambria")
+  }
+}
+```
+
+`r if(nrow(sharetemptotUPC_out1)>0){"### Restatement Subbrand Details"}`
+
+```{r restatement-summary-2, echo=FALSE, warning=FALSE, message=FALSE}
+if(nrow(sharetemptotUPC_out1)>0) {
+  
+  sharetemptotUPC_out2 <- sharetemptotUPC_out1 %>%
+    left_join(., Calendar) %>%
+    mutate(Year = as.character(Year)) %>%
+    select(Subbrand,
+           `$`,
+           `$ Diff`,
+           `EQ`,
+           `EQ Diff`) %>%
+    group_by(Subbrand) %>%
+    SumAll(.) %>%
+    filter(`$ Diff` != 0 | `EQ Diff` != 0) %>%
+    mutate(`$` = scales::dollar(`$`),
+           `$ Diff` = scales::dollar(`$ Diff`)) %>% 
+    arrange(Subbrand)
+
+  if(nrow(sharetemptotUPC_out2)>0){
+    sharetemptotUPC_out2 <-
+    sharetemptotUPC_out2 %>% mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+  knitr::kable(sharetemptotUPC_out2,align=c(rep('c',times=ncol(sharetemptotUPC_out2)))) %>%
+  kable_classic(html_font = "Cambria")
+  }
+}
+```
+
+`r if(nrow(sharetemptotUPC_out1)>0){"### Restatement UPC Details"}`
+
+```{r restatement-summary-3, echo=FALSE, warning=FALSE, message=FALSE}
+if(nrow(sharetemptotUPC_out1)>0) {
+  
+  sharetemptotUPC_out2 <- sharetemptotUPC_out1 %>%
+    left_join(., Calendar) %>%
+    mutate(Year = as.character(Year)) %>%
+    select(Manufacturer,
+           UPC,
+           `$`,
+           `$ Diff`,
+           `EQ`,
+           `EQ Diff`) %>%
+    group_by(UPC, Manufacturer) %>%
+    SumAll(.) %>%
+    filter(`$ Diff` != 0 | `EQ Diff` != 0) %>%
+    mutate(`$` = scales::dollar(`$`),
+           `$ Diff` = scales::dollar(`$ Diff`)) %>% 
+    arrange(Manufacturer, UPC) 
+  if(nrow(sharetemptotUPC_out2)>0){
+    sharetemptotUPC_out2 <-
+    sharetemptotUPC_out2 %>% mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+  knitr::kable(sharetemptotUPC_out2,align=c(rep('c',times=ncol(sharetemptotUPC_out2)))) %>%
+  kable_classic(html_font = "Cambria")
+  }
+}
+```
+
+`r if(nrow(sharetemptotUPC_out1)>0){"### Restatement Details"}`
+
+```{r restatement-summary-4, echo=FALSE, warning=FALSE, message=FALSE}
+if(nrow(sharetemptotUPC_out1)>0) {
+  
+  sharetemptotUPC_out2 <- sharetemptotUPC_out1 %>%
+    left_join(., Calendar) %>%
+    mutate(Year = as.character(Year)) %>%
+    select(Year,
+           `Market Description`,
+           Manufacturer,
+           Subbrand,
+           UPC,
+           `Market Description`,
+           `$`,
+           `$ Diff`,
+           `EQ`,
+           `EQ Diff`) %>%
+    group_by(Year, `Market Description`, UPC, Manufacturer, Subbrand) %>%
+    SumAll(.) %>%
+    mutate(`$` = scales::dollar(`$`),
+           `$ Diff` = scales::dollar(`$ Diff`)) %>% 
+    arrange(Year, `Market Description`, Manufacturer, Subbrand, UPC)
+
+  if(nrow(sharetemptotUPC_out2)>0){
+    sharetemptotUPC_out2 <-
+    sharetemptotUPC_out2 %>% mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+  knitr::kable(sharetemptotUPC_out2,align=c(rep('c',times=ncol(sharetemptotUPC_out2)))) %>%
+  kable_classic(html_font = "Cambria")
+  }
+}
+```
+
+`r if(nrow(KeyItemDiff1)>0){"### Key Changed Items"}`
+
+```{r key-changed-items, echo=FALSE, warning=FALSE, message=FALSE}
+
+if(nrow(KeyItemDiff1)>0){
+  datatable(KeyItemDiff1, options = list(columnDefs=list(list(targets="_all", class="dt-center")), scrollX = TRUE), filter = 'top')
+}
+
+```
+
+`r if(nrow(newTestUPCs1)>0){"### New Items"}`
+
+```{r new-items, echo=FALSE, warning=FALSE, message=FALSE}
+
+if(nrow(newTestUPCs1)>0){
+  datatable(newTestUPCs1, options = list(columnDefs=list(list(targets="_all", class="dt-center")), scrollX = TRUE), filter = 'top')
+}
+
+```

@@ -1,0 +1,42 @@
+SELECT   IT.NIELSEN_MANUFACTURER as Nielsen_Manufacturer
+        ,CASE WHEN RT.RETAILER_NAME = 'Kroger Weekly' THEN 'Kroger' END AS Market_Desc		
+		,CONVERT(DATE, HW.WEEK_END_DATE) AS Period_Desc
+		,ISNULL(IT.ITEM_DESC,'(unassigned)') AS Item
+		,IT.NIELSEN_UPC AS UPC 
+		,ISNULL(IT.NIELSEN_BRAND,'(unassigned)') AS RV_Nielsen_Brand
+		,ISNULL(IT.AN_BRAND_FAMILY,'(unassigned)') AS RV_AN_Brand_Family 
+		,ISNULL(IT.AN_BRAND,'(unassigned)') AS RV_AN_Brand 
+		,ISNULL(IT.NIELSEN_SEGMENT,'(unassigned)') AS RV_Segment 
+		,ISNULL(IT.AN_FORM,'(unassigned)') AS RV_Form 
+		,ISNULL(SUM(HW.DOLLARS), 0) AS Dollars
+		,ISNULL(SUM(HW.UNITS), 0) AS Units
+		,ISNULL(SUM(HW.EQ_UNITS), 0) AS EQ 
+		
+FROM	AbbottSandbox.dbo.vvHistoryWeek HW	
+		,AbbottSandbox.dbo.vvCustomerItem CI
+		,AbbottSandbox.dbo.vvItem IT
+		,AbbottSandbox.dbo.vvRetailer RT
+		,AbbottSandbox.dbo.vvStore ST
+		
+WHERE 	HW.IDX_CUSTOMER_ITEM_CODE = CI.IDX_CUSTOMER_ITEM_CODE	
+	AND IT.IDX_ITEM = CI.IDX_ITEM	
+	AND HW.IDX_RETAILER = RT.IDX_RETAILER	
+	AND HW.IDX_STORE = ST.IDX_STORE	
+	AND HW.IDX_RETAILER = ST.IDX_RETAILER	
+	AND HW.IDX_RETAILER = 58	
+    AND HW.WEEK_END_DATE between 'MIN_WEEK_VARIABLE' and 'MAX_WEEK_VARIABLE'		
+	AND IT.NIELSEN_SEGMENT IN ('BALANCED NUTRITION', 'DIABETES NUTRITION', 'TODDLER NUTRITION'
+								, 'ORAL ELECTROLYTES', 'INFANT FORMULA UA', 'IFUA', 'BN', 'DN'
+								, 'OES', 'TN')	
+	AND ST.TDLINX_ULTAMATE_OWNER = 'Kroger Co/HQ'	
+		
+GROUP BY IT.NIELSEN_MANUFACTURER		
+        ,CASE WHEN RT.RETAILER_NAME = 'Kroger Weekly' THEN 'Kroger' END		
+		,HW.WEEK_END_DATE
+		,ISNULL(IT.ITEM_DESC,'(unassigned)')
+		,IT.NIELSEN_UPC
+		,ISNULL(IT.NIELSEN_BRAND,'(unassigned)')
+		,ISNULL(IT.AN_BRAND_FAMILY ,'(unassigned)')
+		,ISNULL(IT.AN_BRAND,'(unassigned)') 
+		,ISNULL(IT.NIELSEN_SEGMENT ,'(unassigned)')
+		,ISNULL(IT.AN_FORM,'(unassigned)');

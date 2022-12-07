@@ -1,0 +1,701 @@
+---
+title: "Compare Test and Prod"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    theme: cosmo
+---
+
+Compare Test and Prod Rmd
+
+```{r setup, echo=FALSE, warnings = FALSE}
+```
+
+``` {r}
+# runtime: shiny # to make run faster? 
+
+impactsummary <- sharetemptot_out %>%
+  select(NIELSEN_SEGMENT,
+           `Manufacturer`,
+            `$`,
+           `$ Previous`,
+           `$ Diff`,
+           `EQ`,
+           `EQ Previous`,
+           `EQ Diff`) %>%
+  SumAll(.) %>%
+  group_by(NIELSEN_SEGMENT) %>%
+  mutate(`$ Share` = round((`$`/sum(`$`))*100, digits = 2),
+         `EQ Share` = round((`EQ`/sum(`EQ`))*100, digits = 2),
+         `$ Share Previous` = round((`$ Previous`/sum(`$ Previous`))*100, digits = 2),
+         `EQ Share Previous` = round((`EQ Previous`/sum(`EQ Previous`))*100, digits = 2),
+         `$ Share Diff` = `$ Share`-`$ Share Previous`,
+         `EQ Share Diff` = `EQ Share`-`EQ Share Previous`,
+         `$ % Change` = round((`$ Diff`/`$ Previous`)*100, digits = 2),
+         `EQ % Change` = round((`EQ Diff`/`EQ Previous`)*100, digits = 2),
+         `$ % Tot Change` = round((`$ Diff`/sum(`$ Previous`))*100, digits = 2),
+         `EQ % Tot Change` = round((`EQ Diff`/sum(`EQ Previous`))*100, digits = 2)) %>%
+  ungroup(.) %>%
+  filter(`$ Share Diff` != 0 | `EQ Share Diff` != 0 | `$ % Change` != 0 | `EQ % Change` != 0) %>%
+  select(
+    NIELSEN_SEGMENT,
+    `Manufacturer`,
+    `$`,
+    `$ Previous`,
+    `$ Diff`,
+    `$ % Change`,
+    `$ % Tot Change`,
+    `$ Share`,
+    `$ Share Previous`,
+    `$ Share Diff`,
+    `EQ`,
+    `EQ Previous`,
+    `EQ Diff`,
+    `EQ % Change`,
+    `EQ % Tot Change`,
+    `EQ Share`,
+    `EQ Share Previous`,
+    `EQ Share Diff`
+  )
+
+
+impactsummary2021 <- sharetemptot_out %>%
+           filter(
+             `Period Description` >= mdy(
+               '01/09/2021') &
+                 `Period Description` < mdy('01/08/2022')) %>%
+  select(NIELSEN_SEGMENT,
+           `Manufacturer`,
+            `$`,
+           `$ Previous`,
+           `$ Diff`,
+           `EQ`,
+           `EQ Previous`,
+           `EQ Diff`) %>%
+  SumAll(.) %>%
+  group_by(NIELSEN_SEGMENT) %>%
+  mutate(`$ Share` = round((`$`/sum(`$`))*100, digits = 2),
+         `EQ Share` = round((`EQ`/sum(`EQ`))*100, digits = 2),
+         `$ Share Previous` = round((`$ Previous`/sum(`$ Previous`))*100, digits = 2),
+         `EQ Share Previous` = round((`EQ Previous`/sum(`EQ Previous`))*100, digits = 2),
+         `$ Share Diff` = `$ Share`-`$ Share Previous`,
+         `EQ Share Diff` = `EQ Share`-`EQ Share Previous`,
+         `$ % Change` = round((`$ Diff`/`$ Previous`)*100, digits = 2),
+         `EQ % Change` = round((`EQ Diff`/`EQ Previous`)*100, digits = 2),
+         `$ % Tot Change` = round((`$ Diff`/sum(`$ Previous`))*100, digits = 2),
+         `EQ % Tot Change` = round((`EQ Diff`/sum(`EQ Previous`))*100, digits = 2)) %>%
+  ungroup(.) %>%
+  filter(`$ Share Diff` != 0 | `EQ Share Diff` != 0 | `$ % Change` != 0 | `EQ % Change` != 0) %>%
+  select(
+    NIELSEN_SEGMENT,
+    `Manufacturer`,
+    `$`,
+    `$ Previous`,
+    `$ Diff`,
+    `$ % Change`,
+    `$ % Tot Change`,
+    `$ Share`,
+    `$ Share Previous`,
+    `$ Share Diff`,
+    `EQ`,
+    `EQ Previous`,
+    `EQ Diff`,
+    `EQ % Change`,
+    `EQ % Tot Change`,
+    `EQ Share`,
+    `EQ Share Previous`,
+    `EQ Share Diff`
+  )
+
+impactsummary2022 <- sharetemptot_out %>%
+           filter(
+             `Period Description` >= mdy('01/08/2022')) %>%
+  select(NIELSEN_SEGMENT,
+           `Manufacturer`,
+            `$`,
+           `$ Previous`,
+           `$ Diff`,
+           `EQ`,
+           `EQ Previous`,
+           `EQ Diff`) %>%
+  SumAll(.) %>%
+  group_by(NIELSEN_SEGMENT) %>%
+  mutate(`$ Share` = round((`$`/sum(`$`))*100, digits = 2),
+         `EQ Share` = round((`EQ`/sum(`EQ`))*100, digits = 2),
+         `$ Share Previous` = round((`$ Previous`/sum(`$ Previous`))*100, digits = 2),
+         `EQ Share Previous` = round((`EQ Previous`/sum(`EQ Previous`))*100, digits = 2),
+         `$ Share Diff` = `$ Share`-`$ Share Previous`,
+         `EQ Share Diff` = `EQ Share`-`EQ Share Previous`,
+         `$ % Change` = round((`$ Diff`/`$ Previous`)*100, digits = 2),
+         `EQ % Change` = round((`EQ Diff`/`EQ Previous`)*100, digits = 2),
+         `$ % Tot Change` = round((`$ Diff`/sum(`$ Previous`))*100, digits = 2),
+         `EQ % Tot Change` = round((`EQ Diff`/sum(`EQ Previous`))*100, digits = 2)) %>%
+  ungroup(.)%>%
+  filter(`$ Share Diff` != 0 | `EQ Share Diff` != 0 | `$ % Change` != 0 | `EQ % Change` != 0) %>%
+  select(
+    NIELSEN_SEGMENT,
+    `Manufacturer`,
+    `$`,
+    `$ Previous`,
+    `$ Diff`,
+    `$ % Change`,
+    `$ % Tot Change`,
+    `$ Share`,
+    `$ Share Previous`,
+    `$ Share Diff`,
+    `EQ`,
+    `EQ Previous`,
+    `EQ Diff`,
+    `EQ % Change`,
+    `EQ % Tot Change`,
+    `EQ Share`,
+    `EQ Share Previous`,
+    `EQ Share Diff`
+  )
+
+outputdf <- NULL
+thekeylist <- "UPC"
+nameslist <- names(Test_Consumption_Char)
+nameslist2 <- names(Consumption_Char)
+nameslist <- intersect(nameslist, nameslist2)
+Test_Consumption_Char1 <- Test_Consumption_Char %>% select(any_of(nameslist)) %>% distinct(.) #Changed here Test_Consumption_Char1 from Test_Consumption_Char
+Test_Consumption_Char1 <- cleanNAs(Test_Consumption_Char1) #Changed here
+Consumption_Char1 <- Consumption_Char %>% select(any_of(nameslist)) %>% cleanNAs(.) #Changed here
+namesdiff <- nameslist[nameslist != thekeylist]
+for (i in namesdiff)
+{
+  thekeylistcp <- thekeylist
+  vars <- list.append(thekeylistcp, i)
+  df_subseta <- Test_Consumption_Char1 %>% select(all_of(vars)) #Changed here
+  df_subsetb <- Consumption_Char1 %>% select(all_of(vars)) #Changed here
+  #converting to char avoid type conversion issues
+  df_subseta[] <- as.data.frame(lapply(df_subseta, as.character))
+  df_subsetb[] <- as.data.frame(lapply(df_subsetb, as.character))
+  diffs1 <- anti_join(df_subseta, df_subsetb, by = vars)
+  diffs2 <- anti_join(df_subsetb, df_subseta, by = vars)
+  outputdftemp <- diffs1
+  outputdftemp <- bind_rows(outputdftemp, diffs2)
+  #key, field, new, old
+  names(df_subseta) <- list.append(thekeylist, "new")
+  names(df_subsetb) <- list.append(thekeylist, "old")
+  outputdftemp <- outputdftemp %>% select(all_of(thekeylist)) %>% mutate(fieldchanged = i)
+  outputdftemp <- left_join(outputdftemp, df_subseta, by = thekeylist)
+  outputdftemp <- left_join(outputdftemp, df_subsetb, by = thekeylist)
+  if(!is.null(outputdf)){
+    outputdf <- bind_rows(outputdf, outputdftemp)
+  }else{
+    outputdf <- outputdftemp
+  }
+}
+outputdf <- outputdf %>% distinct(.)
+CharInfo <- Test_Consumption_Char %>% select(UPC, NIELSEN_SEGMENT, ITEM_DESC)
+
+#remove where noted in added/dropped UPCs
+outputdfitems <- outputdf %>% distinct(UPC)
+outputdf <-
+  outputdfitems %>% 
+  anti_join(., newTestUPCs) %>% 
+  anti_join(., droppedTestUPCs1) %>% 
+  inner_join(., outputdf) %>% left_join(., CharInfo)
+
+#EQ Changes
+maxWE <- max(Consumption$`Period Description`)
+
+prevEQ <- Test_Consumption %>% filter(`Period Description` < (maxWE - weeks(9))) %>% 
+  select(-c("Period Description", "Market Description")) %>% 
+  SumAll(.) %>% mutate(prev_EQ_Factor = round(EQ/Units, 2)) %>% select(UPC, prev_EQ_Factor, prev_EQ = EQ)
+newEQ <- Test_Consumption %>% filter(`Period Description` <= maxWE &
+                                       `Period Description` >= (maxWE - weeks(9))) %>% 
+  select(-c("Period Description", "Market Description")) %>%
+  SumAll(.) %>% mutate(new_EQ_Factor = round(EQ/Units, 2)) %>% select(UPC, new_EQ_Factor, new_EQ = EQ)
+
+Char1 <- Test_Consumption_Char %>%
+  distinct(UPC, NIELSEN_SEGMENT, `Manufacturer`, Subbrand)
+
+outEQ <-
+  inner_join(newEQ, prevEQ) %>%
+  left_join(., Char1) %>% mutate(diffEQ = round(new_EQ_Factor - prev_EQ_Factor, 2),
+                                       EQ = new_EQ + prev_EQ) %>%
+  filter(diffEQ >= 0.5) %>%
+  select (-c(prev_EQ, new_EQ)) 
+
+
+#ARP Changes
+maxWE <- max(Consumption$`Period Description`)
+
+prevARP <- Test_Consumption %>% filter(`Period Description` < (maxWE - weeks(9))) %>% 
+  select(-c("Period Description", "Market Description")) %>% 
+  SumAll(.) %>% mutate(prev_ARP = round(`$`/Units, 2)) %>% select(UPC, prev_ARP, "prev_$" = `$`)
+newARP <- Test_Consumption %>% filter(`Period Description` <= maxWE &
+                                       `Period Description` >= (maxWE - weeks(9))) %>% 
+  select(-c("Period Description", "Market Description")) %>%
+  SumAll(.) %>% mutate(new_ARP = round(`$`/Units, 2)) %>% select(UPC, new_ARP, "new_$" = `$`)
+
+Char1 <- Test_Consumption_Char %>%
+  distinct(UPC, NIELSEN_SEGMENT, `Manufacturer`, Subbrand)
+
+outARP <-
+  inner_join(newARP, prevARP) %>%
+  left_join(., Char1) %>% mutate(diffARP = round(new_ARP - prev_ARP, 2),
+                                         `$` = `new_$` + `prev_$`) %>%
+  filter(diffARP >= 0.01) %>%
+  select (-c(`prev_$`, `new_$`)) 
+
+
+# Key item char changes ####
+Test_KeyChar <-
+  Test_Consumption_Char %>% select(
+    UPC,
+    "TEST_ABT_BRAND" = ABT_BRAND,
+    "TEST_ABT_SEGMENT" = ABT_SEGMENT,
+    "TEST_ABT_SIZE RANGE" = `ABT_SIZE RANGE`,
+    "TEST_TMC_ABBOTT_PRODUCT" = TMC_ABBOTT_PRODUCT,
+    "TEST_TMC_FORMULA_SEGMENT" = TMC_FORMULA_SEGMENT,
+    "TEST_TMC_INC_SHARE" = TMC_INC_SHARE,
+    "TEST_TMC_MANUFACTURER" = TMC_MANUFACTURER,
+    "TEST_TMC_SUBBRAND_CUSTOM" = TMC_SUBBRAND_CUSTOM,
+    "TEST_NIELSEN_ABT_NAT_ORG" = NIELSEN_ABT_NAT_ORG
+  )
+    
+KeyChar <-
+  Consumption_Char %>% select(
+    UPC,
+    ABT_BRAND,
+    ABT_SEGMENT,
+    `ABT_SIZE RANGE`,
+    TMC_ABBOTT_PRODUCT,
+    TMC_FORMULA_SEGMENT,
+    TMC_INC_SHARE,
+    TMC_MANUFACTURER,
+    TMC_SUBBRAND_CUSTOM,
+    NIELSEN_ABT_NAT_ORG
+  )
+
+KeyItemDiff <- inner_join(Test_KeyChar, KeyChar) %>%
+  mutate(
+    "DIFF_ABT_BRAND" = if_else(`TEST_ABT_BRAND` == `ABT_BRAND`, FALSE, TRUE),
+    "DIFF_ABT_SEGMENT" = if_else(`TEST_ABT_SEGMENT` == `ABT_SEGMENT`, FALSE, TRUE),
+    "DIFF_ABT_SIZE RANGE" = if_else(`TEST_ABT_SIZE RANGE` == `ABT_SIZE RANGE`, FALSE, TRUE),
+    "DIFF_TMC_ABBOTT_PRODUCT" = if_else(`TEST_TMC_ABBOTT_PRODUCT` == `TMC_ABBOTT_PRODUCT`, FALSE, TRUE),
+    "DIFF_TMC_FORMULA_SEGMENT" = if_else(
+      `TEST_TMC_FORMULA_SEGMENT` == `TMC_FORMULA_SEGMENT`,
+      FALSE, TRUE
+    ),
+    "DIFF_TMC_INC_SHARE" = if_else(`TEST_TMC_INC_SHARE` == `TMC_INC_SHARE`, FALSE, TRUE),
+    "DIFF_TMC_MANUFACTURER" = if_else(`TEST_TMC_MANUFACTURER` == `TMC_MANUFACTURER`, FALSE, TRUE),
+    "DIFF_TMC_SUBBRAND_CUSTOM" = if_else(
+      `TEST_TMC_SUBBRAND_CUSTOM` == `TMC_SUBBRAND_CUSTOM`,
+      FALSE, TRUE
+    ),
+    "DIFF_NIELSEN_ABT_NAT_ORG" = if_else(`TEST_NIELSEN_ABT_NAT_ORG` == `NIELSEN_ABT_NAT_ORG`, FALSE, TRUE)
+  )
+KeyItemDiff <- KeyItemDiff %>% select(
+  UPC,
+  "TEST_ABT_BRAND",
+  "ABT_BRAND",
+  "DIFF_ABT_BRAND",
+  "TEST_ABT_SEGMENT",
+  "ABT_SEGMENT",
+  "DIFF_ABT_SEGMENT",
+  "TEST_ABT_SIZE RANGE",
+  "ABT_SIZE RANGE",
+  "DIFF_ABT_SIZE RANGE",
+  "TEST_TMC_ABBOTT_PRODUCT",
+  "TMC_ABBOTT_PRODUCT",
+  "DIFF_TMC_ABBOTT_PRODUCT",
+  "TEST_TMC_FORMULA_SEGMENT",
+  "TMC_FORMULA_SEGMENT",
+  "DIFF_TMC_FORMULA_SEGMENT",
+  "TEST_TMC_INC_SHARE",
+  "TMC_INC_SHARE",
+  "DIFF_TMC_INC_SHARE",
+  "TEST_TMC_MANUFACTURER",
+  "TMC_MANUFACTURER",
+  "DIFF_TMC_MANUFACTURER",
+  "TEST_TMC_SUBBRAND_CUSTOM",
+  "TMC_SUBBRAND_CUSTOM",
+  "DIFF_TMC_SUBBRAND_CUSTOM",
+  "TEST_NIELSEN_ABT_NAT_ORG",
+  "NIELSEN_ABT_NAT_ORG",
+  "DIFF_NIELSEN_ABT_NAT_ORG"
+) %>% filter(
+  `DIFF_ABT_BRAND` != FALSE |
+    `DIFF_ABT_SEGMENT` != FALSE |
+    `DIFF_ABT_SIZE RANGE` != FALSE |
+    `DIFF_TMC_ABBOTT_PRODUCT` != FALSE |
+    `DIFF_TMC_FORMULA_SEGMENT` != FALSE |
+    `DIFF_TMC_INC_SHARE` != FALSE |
+    `DIFF_TMC_MANUFACTURER` != FALSE |
+    `DIFF_TMC_SUBBRAND_CUSTOM` != FALSE|
+    `DIFF_NIELSEN_ABT_NAT_ORG` != FALSE
+)
+```
+
+```{css my-content, echo = FALSE}
+.rpivotTable{ overflow-x: scroll; }
+```
+Process Log
+===================================== 
+
+Column {data-width=600}
+-------------------------------------
+   
+### ProcessLog
+
+*** 
+
+Process Log
+
+```{r}
+logfile1 <- includeMarkdown(paste0(RScriptdirectoryLoc,"TMC20log.Rmd"))
+logfile1
+```
+
+
+Comparisons
+=====================================   
+
+*** 
+
+Comparisons
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+
+### Retailer and Mfr Pivot
+
+*** 
+
+```{r}
+if(nrow(compretandmfr)>0){
+  rpivotTable(compretandmfr, rows = c("Period Description","Market Description"), 
+            cols = c("NIELSEN_SEGMENT","Manufacturer"), aggregatorName = "Sum", vals = c("$ Diff", "EQ Diff"))
+}
+```
+
+
+### Retailer and Mfr Pivot UPC
+
+*** 
+
+```{r}
+if(nrow(sharetemptotUPC_out)>0) {
+  rpivotTable(
+    sharetemptotUPC_out,
+    rows = c("Period Description", "Market Description", "UPC"),
+    cols = c("NIELSEN_SEGMENT", "Manufacturer"),
+    aggregatorName = "Sum",
+    vals = c("$ Diff", "EQ Diff")
+  )
+}
+```
+
+
+### Full Impact Summary
+
+*** 
+
+All Time Impact
+
+```{r}
+impactsummary <- impactsummary %>% mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+datatable(impactsummary, options = list(columnDefs=list(list(targets="_all", class="dt-center")), scrollY = "425px"))
+```
+
+### 2021 Impact Summary
+
+*** 
+
+2021 Impact
+
+```{r}
+impactsummary2021 <- impactsummary2021 %>% mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+datatable(impactsummary2021, options = list(columnDefs=list(list(targets="_all", class="dt-center")), scrollY = "425px"))
+```
+
+<!-- ### 2021 Impact Summary Pivot -->
+
+<!-- ***  -->
+
+<!-- ```{r} -->
+<!-- if(nrow(impactsummary2021)>0) { -->
+<!--   rpivotTable( -->
+<!--     impactsummary2021, -->
+<!--     rows = c("$ Share", "$ Share Previous", "EQ Share", "EQ Share Previous"), -->
+<!--     cols = c("NIELSEN_SEGMENT", "Manufacturer"), -->
+<!--     aggregatorName = "Sum", -->
+<!--     vals = c("$ Share Diff", "EQ Diff") -->
+<!--   ) -->
+<!-- } -->
+<!-- ``` -->
+
+### 2022 Impact Summary
+
+*** 
+
+2022 Impact
+
+```{r}
+impactsummary2022 <- impactsummary2022 %>% mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+datatable(impactsummary2022, options = list(columnDefs=list(list(targets="_all", class="dt-center")), scrollY = "425px"))
+```
+
+<!-- ### 2022 Impact Summary Pivot -->
+
+<!-- ***  -->
+
+<!-- ```{r} -->
+<!-- if(nrow(impactsummary2022)>0) { -->
+<!--   rpivotTable( -->
+<!--     impactsummary2022, -->
+<!--     rows = c("$ Share", "$ Share Previous", "EQ Share", "EQ Share Previous"), -->
+<!--     cols = c("NIELSEN_SEGMENT", "Manufacturer"), -->
+<!--     aggregatorName = "Sum", -->
+<!--     vals = c("$ Share Diff", "EQ Diff") -->
+<!--   ) -->
+<!-- } -->
+<!-- ``` -->
+
+### New ASIN UPC Combos
+
+*** 
+
+New ASIN UPC Combos
+
+```{r}
+newasinAssign <- newasinAssign %>% mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+datatable(newasinAssign, options = list(columnDefs=list(list(targets="_all", class="dt-center")), scrollY = "425px"))
+
+```
+
+### New UPCs
+
+*** 
+
+New UPCs
+
+```{r}
+newTestUPCs <- newTestUPCs %>% mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+datatable(newTestUPCs, options = list(columnDefs=list(list(targets="_all", class="dt-center")), scrollY = "425px"))
+
+```
+
+### Dropped ASIN UPC Combos
+
+*** 
+
+Dropped ASIN UPC Combos not being remapped.
+
+```{r}
+droppedasinAssign <- droppedasinAssign %>% mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+datatable(droppedasinAssign, options = list(columnDefs=list(list(targets="_all", class="dt-center")), scrollY = "425px"))
+
+```
+
+### Dropped UPCs
+
+*** 
+
+Dropped UPCs not noted in AMZ
+
+```{r}
+droppedTestUPCs <- droppedTestUPCs %>% mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+datatable(droppedTestUPCs, options = list(columnDefs=list(list(targets="_all", class="dt-center")), scrollY = "425px"))
+
+```
+
+### Full Changed Items
+
+*** 
+
+Full Changed Items
+
+```{r}
+outputdf <- outputdf %>% mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+datatable(outputdf, options = list(columnDefs=list(list(targets="_all", class="dt-center")), scrollX = TRUE, scrollY = "425px",server =TRUE), filter = 'top')
+
+```
+
+### Key Changed Items
+
+*** 
+
+Key Changed Items
+
+```{r}
+KeyItemDiff <- KeyItemDiff %>% mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+datatable(KeyItemDiff, options = list(columnDefs=list(list(targets="_all", class="dt-center")), scrollX = TRUE,scrollY = "425px"), filter = 'top')
+
+```
+
+
+<!-- ### Key Changed Items Pivot -->
+
+<!-- ***  -->
+
+<!-- ```{r} -->
+<!-- if(nrow(KeyItemDiff)>0) { -->
+<!--   rpivotTable( -->
+<!--     KeyItemDiff, -->
+<!--     rows = c("UPC"), -->
+<!--     cols = c( -->
+<!--       "DIFF_ABT_BRAND", -->
+<!--       "DIFF_ABT_SEGMENT", -->
+<!--       "DIFF_ABT_SIZE_RANGE", -->
+<!--       "DIFF_TMC_ABBOTT_PRODUCT", -->
+<!--       "DIFF_ABT_SIZE RANGE", -->
+<!--       "DIFF_TMC_ABBOTT_PRODUCT", -->
+<!--       "DIFF_TMC_FORMULA_SEGMENT", -->
+<!--       "DIFF_TMC_INC_SHARE", -->
+<!--       "DIFF_TMC_MANUFACTURER", -->
+<!--       "DIFF_TMC_SUBBRAND_CUSTOM", -->
+<!--       "DIFF_NIELSEN_ABT_NAT_ORG" -->
+<!--     ) -->
+<!--   ) -->
+<!-- } -->
+<!-- ``` -->
+
+### Inconsistent EQs
+
+*** 
+
+Items with inconsistent historical EQ factors
+
+```{r}
+outEQ <- outEQ %>% mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+datatable(outEQ, options = list(columnDefs=list(list(targets="_all", class="dt-center")),scrollY = "425px"))
+```
+
+### Inconsistent ARP
+
+*** 
+
+Items with inconsistent historical ARP
+
+```{r}
+outARP <- outARP %>% mutate_if(is.numeric, ~ prettyNum(round(., 2), big.mark = ","))
+datatable(outARP, options = list(columnDefs=list(list(targets="_all", class="dt-center")),scrollY = "425px"))
+```
+
+Costco $ Plot 
+=====================================   
+
+*** 
+
+### Costco Sales by Segment/Week
+
+-------------------------------------
+
+```{r}
+CostcoSegmentTTL <- read_csv(paste0(CSV_XLdirectoryLoc, "CostcoTotals.csv"))
+CostcoSegmentTTL <- filter(CostcoSegmentTTL, `Period Description` >= maxWE - weeks(9))
+fig <- CostcoSegmentTTL %>% 
+  group_by(NIELSEN_SEGMENT) %>% 
+  plot_ly(x= ~`Period Description`, y = ~`$`, type = 'scatter', color=~NIELSEN_SEGMENT, mode = 'lines') %>% layout(xaxis=list(title="Date"),yaxis=list(title="$"))
+fig <- fig %>% layout(title = 'L9 Costco Sales by Segment')
+fig
+
+```
+
+Comparison to Velocity
+===================================== 
+***
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+
+### VelocityComparison1
+
+YoY comparison to Velocity data with Nielsen retailer data. High variance (1) is defined as a category-retailer combination with >50% difference in recent time periods vs YAG in Velocity vs the TMC output (from Connect data).
+
+```{r}
+VelCompSum <- read_csv(paste0(CSV_XLdirectoryLoc,"VelocityCompSummary.csv"))
+names(VelCompSum) <- c("Market", "Brand", "TMC $ LW vs LY", "Velocity $ LW vs LY", "Variance $ LW vs LY", "TMC $ L13 vs LY", "Velocity $ L13 vs LY", "Variance $ L13 vs LY", "High Variance")
+VelCompSum <- VelCompSum %>% mutate(`Variance $ LW vs LY` = round(`Variance $ LW vs LY` , 2),`Variance $ L13 vs LY` = round(`Variance $ L13 vs LY` , 2))
+#VelCompSum <- VelCompSum %>% filter(`High Variance` == 1)
+datatable(VelCompSum, filter = 'top', options = list(targets="_all", class="dt-center", pageLength = 50, scrollY = "400px",width = 'auto'))
+```
+
+### VelocityComparison2
+*** 
+
+Variance check of historical difference between Velocity and TMC based on L26.
+
+```{r}
+VelCompSum2 <- read_csv(paste0(CSV_XLdirectoryLoc,"VelocityCompSummary2.csv"))
+names(VelCompSum2) <- c("Market", "Period", "Brand", "$ Vel", "$ TMC", "$ Variance", "flg_lw","Median", "3 sd", "Min Expected", "Max Expected", "High Variance")
+#VelCompSum2 <- VelCompSum2 %>% filter(flg_lw == 1 & `High Variance` == 1)
+datatable(VelCompSum2, filter = 'top', options = list(targets="_all", class="dt-center", pageLength = 50, scrollY = "400px",width = 'auto'))
+```
+
+Key Field Validations
+=====================================   
+
+*** 
+
+Key Field Validations
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+  
+### ItemsMissingKeyField
+
+*** 
+
+Items missing a key field. This could impact charts in TMC.
+
+```{r}
+datatable(read_csv(paste0(CSV_XLdirectoryLoc, "naChar.csv")), filter = 'top', options = list(pageLength = 50, scrollY = "500px", autoWidth = TRUE,columnDefs = list(list(width = '350px', targets = c(22,23,66)),list(width = 'auto', targets = "_all"))))
+```
+
+### ItemswithCalculatedFormulaSegment
+
+*** 
+
+Verify items that have a calculated formula segment.
+
+```{r}
+datatable(read_csv(paste0(CSV_XLdirectoryLoc, "naFormSegment.csv")), filter = 'top',options = list(pageLength = 50, scrollY = "500px", autoWidth = TRUE,columnDefs = list(list(width = '350px', targets = c(21,22,65)),list(width = '100', targets = c(1)),list(width = 'auto', targets = "_all"))))
+```
+
+### NewSubbrand
+
+*** 
+
+Verify items that have a subbrand not previously in the data.
+
+```{r}
+datatable(read_csv(paste0(CSV_XLdirectoryLoc, "NewSubbrands.csv")), filter = 'top', options = list(pageLength = 50, scrollY = "500px", autoWidth = TRUE,columnDefs = list(list(width = '350px', targets = c(21,22,65)),list(width = '100', targets = c(1)),list(width = 'auto', targets = "_all"))))
+```
+
+Items Missing An EQ
+===================================== 
+  
+### ItemsMissingEQ
+
+*** 
+
+These items need an EQ added to the source data.
+
+```{r}
+datatable(read_csv(paste0(CSV_XLdirectoryLoc, "itemsMissingEQ.csv")), filter = 'top', options = list(pageLength = 50, scrollY = "500px", autoWidth = TRUE,columnDefs = list(list(width = '350px', targets = c(21,22,65)),list(width = 'auto', targets = "_all"))))
+```
+
+LW Outliers
+=====================================   
+
+*** 
+
+Unusual LW volume items. These are flagged if they fall outside of 3 standard deviations of the L13 weeks.
+
+### LWOutlier$
+
+```{r}
+datatable(read_csv(paste0(CSV_XLdirectoryLoc, "LWDolOutlierwide.csv")), options = list(pageLength = 50, scrollY = "425px"))
+```
+
+### LWOutlierEQ
+
+```{r}
+datatable(read_csv(paste0(CSV_XLdirectoryLoc, "LWEQOutlierwide.csv")), options = list(pageLength = 50, scrollY = "425px"))
+```

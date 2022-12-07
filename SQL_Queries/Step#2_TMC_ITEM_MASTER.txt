@@ -1,0 +1,1518 @@
+/**************CAUTION************Execute After the TMC20_PROD (fact) script Has Been Completed******************************************                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
+
+This script refreshes the Item Master table which is created:
+1) by sourcing an ITN and LN 5 years of Nielsen item data via extracts 
+2) then applying 3 Business rules for unioning Nielsen characteristic data with Retail Velocity's vvItem
+
+
+**************************************************************************************************************************************
+
+**************************************************************************************************************************************
+
+--A.                            Loading Nielsen extracts and RV characteristic data
+
+**************************************************************************************************************************************/
+DELETE mitest.T_Item_Master; --clear table
+
+DROP TABLE IF EXISTS #Nielsen_Item_Master;
+
+select 	UPC,   
+		ABT_Brand,
+		case 
+			when ABT_Brand = 'Pediasure Excl Peptide' then 'Pediasure'
+			else ABT_Brand
+			end	as ABT_Brand_Family,
+		ABT_Category,
+		'N/A' as ABT_Fiber_Tn,
+		ABT_Flavor,
+		ABT_Form,
+		'N/A' as ABT_Formula_Formulation,
+		'' as ABT_Formula_SubTy,
+		'' as ABT_Formula_Ty,
+		ABT_Manufacturer,
+		'N/A' as ABT_Natural_Organic,
+		ABT_Pack,
+		'N/A' as ABT_Pack_Size,
+		case 
+			when ABT_Segment = 'BALANCED NUTRITION' then ABT_Segment
+			when ABT_Segment =  'DIABETES NUTRITION' then ABT_Segment
+			when ABT_Segment = 'TODDLER NUTRITION' then ABT_Segment
+			when ABT_Segment =  'ORAL ELECTROLYTES' then ABT_Segment
+			when ABT_Segment =  'INFANT FORMULA UA' then ABT_Segment
+			when ABT_Segment =  'IFUA' then 'INFANT FORMULA UA'
+			when ABT_Segment =  'BN' then 'BALANCED NUTRITION'
+			when ABT_Segment =  'DN' then 'DIABETES NUTRITION'
+			when ABT_Segment =  'OES' then 'ORAL ELECTROLYTES'
+			when ABT_Segment =  'TN' then 'TODDLER NUTRITION'
+		end as ABT_Segment,
+		'N/A' as ABT_Size_Range,
+		ABT_Subbrand,
+		'N/A' as ABT_Subbrand_Grp,
+		ABT_Subsegment,
+		'N/A' as ABT_Variant,
+		Brand_High,
+		Brand_Low,
+		Brand_Owner,
+		'N/A' as Brand_Owner_High,
+		ABT_Flavor as Flavor,
+		ABT_Form as Form,
+		Item_Desc,
+		'N/A' as Outer_Pack_Size,
+		'N/A' as Package_General_Shape,
+		'N/A' as Serving_Per_Container,
+		'N/A' as Serving_Size_Household,
+		'N/A' as Total_Size,
+		'N/A' as Yield,
+		'Non-Rebated' as ABT_Formula_Reb_NonReb,
+		ABT_Count_Size,
+		null as ABT_Multi,
+		'N/A' as Nielsen_ABT_Size,
+		'N/A' as Nielsen_ABT_Flavor_Group,
+		ABT_Count_Group_Form as [ABT_Count Group (Form)], 
+		case 
+			when ABT_Segment = 'BALANCED NUTRITION' then 'Adult'
+			when ABT_Segment =  'DIABETES NUTRITION' then 'Adult'
+			when ABT_Segment = 'TODDLER NUTRITION' then 'Toddler'
+			when ABT_Segment =  'ORAL ELECTROLYTES' then 'Toddler'
+			when ABT_Segment =  'INFANT FORMULA UA' then 'IFUA'
+			when ABT_Segment =  'IFUA' then ABT_Segment
+			when ABT_Segment =  'BN' then 'Adult'
+			when ABT_Segment =  'DN' then 'Adult'
+			when ABT_Segment =  'OES' then 'Toddler'
+			when ABT_Segment =  'TN' then 'Toddler'
+		end as inc_share, 
+		case 
+			when ABT_Segment = 'BALANCED NUTRITION' then ABT_Segment
+			when ABT_Segment =  'DIABETES NUTRITION' then ABT_Segment
+			when ABT_Segment = 'TODDLER NUTRITION' then ABT_Segment
+			when ABT_Segment =  'ORAL ELECTROLYTES' then ABT_Segment
+			when ABT_Segment =  'INFANT FORMULA UA' then ABT_Segment
+			when ABT_Segment =  'IFUA' then 'INFANT FORMULA UA'
+			when ABT_Segment =  'BN' then 'BALANCED NUTRITION'
+			when ABT_Segment =  'DN' then 'DIABETES NUTRITION'
+			when ABT_Segment =  'OES' then 'ORAL ELECTROLYTES'
+			when ABT_Segment =  'TN' then 'TODDLER NUTRITION'
+		end AN_SEGMENT, 
+		'N/A' as AN_WIC_REBATE_PRODUCT,
+		ABT_Manufacturer as NIELSEN_MANUFACTURER,
+		ABT_SUBBRAND as AN_BRAND,
+		ABT_Form as NIELSEN_ABT_FORM,
+		ABT_Flavor as NIELSEN_ABT_FLAVOR,
+		Item_Desc as NIELSEN_DESCRIPTION,
+		'N/A' as NIELSEN_ORGANIC_CLAIM,
+		UPC as FULL_UPC,
+		'' as EQ_FACTOR,
+		case 
+			when ABT_Manufacturer = 'ABBOTT' then 'Yes'
+			when ABT_Manufacturer = 'ABBOTT NUTRITION' then 'Yes'
+			else 'No'
+		end as ABBOTT_PRODUCT,
+		'LIFESTYLE NUTRITION & CAT MAN' as NIELSEN_ABT_MEGA_CATEGORY,
+		'LIFESTYLE NUTRITION & CAT MAN' as NIELSEN_MEGA_CATG,
+		ABT_Subsegment as NIELSEN_SUBSEGMENT,
+		ABT_FLAVOR as NIELSEN_FLAVOR_GROUP,
+		'N/A' as NIELSEN_FORMULATION,
+		'N/A' as [Formula Segment],
+		ABT_Manufacturer as Manufacturer,
+		ABT_Subbrand as Subbrand,
+		ABT_Subbrand as TMC_SUBBRAND_CUSTOM,
+		ABT_Manufacturer as TMC_MANUFACTURER,
+		'N/A' as TMC_FORMULA_SEGMENT,
+		case 
+			when ABT_Manufacturer = 'ABBOTT' then 'Yes'
+			when ABT_Manufacturer = 'ABBOTT NUTRITION' then 'Yes'
+			else 'No'
+		end as TMC_ABBOTT_PRODUCT,
+		'' as TMC_EQ_FACTOR,
+		case 
+			when ABT_Segment = 'BALANCED NUTRITION' then 'Adult'
+			when ABT_Segment =  'DIABETES NUTRITION' then 'Adult'
+			when ABT_Segment = 'TODDLER NUTRITION' then 'Toddler'
+			when ABT_Segment =  'ORAL ELECTROLYTES' then 'Toddler'
+			when ABT_Segment =  'INFANT FORMULA UA' then 'IFUA'
+			when ABT_Segment =  'IFUA' then ABT_Segment
+			when ABT_Segment =  'BN' then 'Adult'
+			when ABT_Segment =  'DN' then 'Adult'
+			when ABT_Segment =  'OES' then 'Toddler'
+			when ABT_Segment =  'TN' then 'Toddler'
+		end as TMC_INC_SHARE,
+		Item_Desc as TMC_ITEM_DESC,
+		'' as EACHES_PER_SCANNED_ITEM
+		
+into 	#Nielsen_Item_Master
+
+from 	mitest.T_Niel_Extract_Item_LN
+
+union
+
+select	'GN'+ REVERSE(SUBSTRING(UPC,3,10)),   
+		ABT_Brand,
+		case 
+			when ABT_Brand = 'Pediasure Excl Peptide' then 'Pediasure'
+			else ABT_Brand
+			end	as ABT_Brand_Family,
+		ABT_Category,
+		'N/A' as ABT_Fiber_Tn,
+		ABT_Flavor,
+		ABT_Form,
+		'N/A' as ABT_Formula_Formulation,
+		'' as ABT_Formula_SubTy,
+		'' as ABT_Formula_Ty,
+		ABT_Manufacturer,
+		'N/A' as ABT_Natural_Organic,
+		ABT_Pack,
+		'N/A' as ABT_Pack_Size,
+		case 
+			when ABT_Segment = 'BALANCED NUTRITION' then ABT_Segment
+			when ABT_Segment =  'DIABETES NUTRITION' then ABT_Segment
+			when ABT_Segment = 'TODDLER NUTRITION' then ABT_Segment
+			when ABT_Segment =  'ORAL ELECTROLYTES' then ABT_Segment
+			when ABT_Segment =  'INFANT FORMULA UA' then ABT_Segment
+			when ABT_Segment =  'IFUA' then 'INFANT FORMULA UA'
+			when ABT_Segment =  'BN' then 'BALANCED NUTRITION'
+			when ABT_Segment =  'DN' then 'DIABETES NUTRITION'
+			when ABT_Segment =  'OES' then 'ORAL ELECTROLYTES'
+			when ABT_Segment =  'TN' then 'TODDLER NUTRITION'
+		end as ABT_Segment,
+		'N/A' as ABT_Size_Range,
+		ABT_Subbrand,
+		'N/A' as ABT_Subbrand_Grp,
+		ABT_Subsegment,
+		'N/A' as ABT_Variant,
+		Brand_High,
+		Brand_Low,
+		Brand_Owner,
+		'N/A' as Brand_Owner_High,
+		ABT_Flavor as Flavor,
+		ABT_Form as Form,
+		Item_Desc,
+		'N/A' as Outer_Pack_Size,
+		'N/A' as Package_General_Shape,
+		'N/A' as Serving_Per_Container,
+		'N/A' as Serving_Size_Household,
+		'N/A' as Total_Size,
+		'N/A' as Yield,
+		'Non-Rebated' as ABT_Formula_Reb_NonReb,
+		ABT_Count_Size,
+		null as ABT_Multi,
+		'N/A' as Nielsen_ABT_Size,
+		'N/A' as Nielsen_ABT_Flavor_Group,
+		ABT_Count_Group_Form as [ABT_Count Group (Form)], 
+		case 
+			when ABT_Segment = 'BALANCED NUTRITION' then 'Adult'
+			when ABT_Segment =  'DIABETES NUTRITION' then 'Adult'
+			when ABT_Segment = 'TODDLER NUTRITION' then 'Toddler'
+			when ABT_Segment =  'ORAL ELECTROLYTES' then 'Toddler'
+			when ABT_Segment =  'INFANT FORMULA UA' then 'IFUA'
+			when ABT_Segment =  'IFUA' then ABT_Segment
+			when ABT_Segment =  'BN' then 'Adult'
+			when ABT_Segment =  'DN' then 'Adult'
+			when ABT_Segment =  'OES' then 'Toddler'
+			when ABT_Segment =  'TN' then 'Toddler'
+		end as inc_share, 
+		case 
+			when ABT_Segment = 'BALANCED NUTRITION' then ABT_Segment
+			when ABT_Segment =  'DIABETES NUTRITION' then ABT_Segment
+			when ABT_Segment = 'TODDLER NUTRITION' then ABT_Segment
+			when ABT_Segment =  'ORAL ELECTROLYTES' then ABT_Segment
+			when ABT_Segment =  'INFANT FORMULA UA' then ABT_Segment
+			when ABT_Segment =  'IFUA' then 'INFANT FORMULA UA'
+			when ABT_Segment =  'BN' then 'BALANCED NUTRITION'
+			when ABT_Segment =  'DN' then 'DIABETES NUTRITION'
+			when ABT_Segment =  'OES' then 'ORAL ELECTROLYTES'
+			when ABT_Segment =  'TN' then 'TODDLER NUTRITION'
+		end AN_SEGMENT, 
+		'N/A' as AN_WIC_REBATE_PRODUCT,
+		ABT_Manufacturer as NIELSEN_MANUFACTURER,
+		ABT_SUBBRAND as AN_BRAND,
+		ABT_Form as NIELSEN_ABT_FORM,
+		ABT_Flavor as NIELSEN_ABT_FLAVOR,
+		Item_Desc as NIELSEN_DESCRIPTION,
+		'N/A' as NIELSEN_ORGANIC_CLAIM,
+		UPC as FULL_UPC,
+		'' as EQ_FACTOR,
+		case 
+			when ABT_Manufacturer = 'ABBOTT' then 'Yes'
+			when ABT_Manufacturer = 'ABBOTT NUTRITION' then 'Yes'
+			else 'No'
+		end as ABBOTT_PRODUCT,
+		'LIFESTYLE NUTRITION & CAT MAN' as NIELSEN_ABT_MEGA_CATEGORY,
+		'LIFESTYLE NUTRITION & CAT MAN' as NIELSEN_MEGA_CATG,
+		ABT_Subsegment as NIELSEN_SUBSEGMENT,
+		ABT_FLAVOR as NIELSEN_FLAVOR_GROUP,
+		'NA' as NIELSEN_FORMULATION,
+		'NA' as [Formula Segment],
+		ABT_Manufacturer as Manufacturer,
+		ABT_Subbrand as Subbrand,
+		ABT_Subbrand as TMC_SUBBRAND_CUSTOM,
+		ABT_Manufacturer as TMC_MANUFACTURER,
+		'NA' as TMC_FORMULA_SEGMENT,
+		case 
+			when ABT_Manufacturer = 'ABBOTT' then 'Yes'
+			when ABT_Manufacturer = 'ABBOTT NUTRITION' then 'Yes'
+			else 'No'
+		end as TMC_ABBOTT_PRODUCT,
+		'' as TMC_EQ_FACTOR,
+		case 
+			when ABT_Segment = 'BALANCED NUTRITION' then 'Adult'
+			when ABT_Segment =  'DIABETES NUTRITION' then 'Adult'
+			when ABT_Segment = 'TODDLER NUTRITION' then 'Toddler'
+			when ABT_Segment =  'ORAL ELECTROLYTES' then 'Toddler'
+			when ABT_Segment =  'INFANT FORMULA UA' then 'IFUA'
+			when ABT_Segment =  'IFUA' then ABT_Segment
+			when ABT_Segment =  'BN' then 'Adult'
+			when ABT_Segment =  'DN' then 'Adult'
+			when ABT_Segment =  'OES' then 'Toddler'
+			when ABT_Segment =  'TN' then 'Toddler'
+		end as TMC_INC_SHARE,
+		Item_Desc as TMC_ITEM_DESC,
+		'' as EACHES_PER_SCANNED_ITEM
+		
+from 	mitest.T_Niel_Extract_Item_LN
+
+union 
+
+select	UPC,
+		ABT_Brand,
+		case 
+			when ABT_Brand = 'Pediasure Excl Peptide' then 'Pediasure'
+			else ABT_Brand
+			end	as ABT_Brand_Family,
+		ABT_Category,
+		ABT_Fiber_Tn,
+		ABT_Flavor,
+		ABT_Form,
+		ABT_Formula_Formulation,
+		ABT_Formula_SubTy,
+		ABT_Formula_Ty,
+		ABT_Manufacturer,
+		ABT_Natural_Organic,
+		ABT_Pack,
+		ABT_Pack_Size,
+		case 
+			when ABT_Segment = 'BALANCED NUTRITION' then ABT_Segment
+			when ABT_Segment =  'DIABETES NUTRITION' then ABT_Segment
+			when ABT_Segment = 'TODDLER NUTRITION' then ABT_Segment
+			when ABT_Segment =  'ORAL ELECTROLYTES' then ABT_Segment
+			when ABT_Segment =  'INFANT FORMULA UA' then ABT_Segment
+			when ABT_Segment =  'IFUA' then 'INFANT FORMULA UA'
+			when ABT_Segment =  'BN' then 'BALANCED NUTRITION'
+			when ABT_Segment =  'DN' then 'DIABETES NUTRITION'
+			when ABT_Segment =  'OES' then 'ORAL ELECTROLYTES'
+			when ABT_Segment =  'TN' then 'TODDLER NUTRITION'
+		end as ABT_Segment,
+		ABT_Size_Range,
+		ABT_Subbrand,
+		ABT_Subbrand_Grp,
+		ABT_Subsegment,
+		ABT_Variant,
+		Brand_High,
+		Brand_Low,
+		Brand_Owner,
+		Brand_Owner_High,
+		Flavor,
+		Form,
+		Item_Desc,
+		Outer_Pack_Size,
+		Package_General_Shape,
+		Serving_Per_Container,
+		Serving_Size_Household,
+		Total_Size,
+		Yield,
+		ABT_Formula_Reb_NonReb,
+		ABT_Count_Size,
+		convert(int, ABT_Multi) as ABT_Multi,
+		'N/A' as Nielsen_ABT_Size,
+		'N/A' as Nielsen_ABT_Flavor_Group,
+		'N/A' as [ABT_Count Group (Form)], 
+		case 
+			when ABT_Segment = 'BALANCED NUTRITION' then 'Adult'
+			when ABT_Segment =  'DIABETES NUTRITION' then 'Adult'
+			when ABT_Segment = 'TODDLER NUTRITION' then 'Toddler'
+			when ABT_Segment =  'ORAL ELECTROLYTES' then 'Toddler'
+			when ABT_Segment =  'INFANT FORMULA UA' then 'IFUA'
+			when ABT_Segment =  'IFUA' then ABT_Segment
+			when ABT_Segment =  'BN' then 'Adult'
+			when ABT_Segment =  'DN' then 'Adult'
+			when ABT_Segment =  'OES' then 'Toddler'
+			when ABT_Segment =  'TN' then 'Toddler'
+		end as inc_share, 
+		case 
+			when ABT_Segment = 'BALANCED NUTRITION' then ABT_Segment
+			when ABT_Segment =  'DIABETES NUTRITION' then ABT_Segment
+			when ABT_Segment = 'TODDLER NUTRITION' then ABT_Segment
+			when ABT_Segment =  'ORAL ELECTROLYTES' then ABT_Segment
+			when ABT_Segment =  'INFANT FORMULA UA' then ABT_Segment
+			when ABT_Segment =  'IFUA' then 'INFANT FORMULA UA'
+			when ABT_Segment =  'BN' then 'BALANCED NUTRITION'
+			when ABT_Segment =  'DN' then 'DIABETES NUTRITION'
+			when ABT_Segment =  'OES' then 'ORAL ELECTROLYTES'
+			when ABT_Segment =  'TN' then 'TODDLER NUTRITION'
+		end as AN_SEGMENT, 
+		case 
+			when ABT_Formula_Reb_NonReb = 'REBATED' then 'Y'
+			when ABT_Formula_Reb_NonReb = 'NON-REBATED' then 'N'
+			else 'Non-Rebated'
+			end as AN_WIC_REBATE_PRODUCT,
+		ABT_Manufacturer as NIELSEN_ABT_MANUFACTURER,
+		ABT_Subbrand as AN_BRAND,
+		ABT_Form as NIELSEN_ABT_FORM,
+		Flavor as NIELSEN_ABT_FLAVOR,
+		Item_Desc as NIELSEN_DESCRIPTION,
+		ABT_Natural_Organic as NIELSEN_ORGANIC_CLAIM,
+		UPC as FULL_UPC,
+		'' as EQ_FACTOR,
+		case 
+			when ABT_Manufacturer = 'ABBOTT' then 'Yes'
+			when ABT_Manufacturer = 'ABBOTT NUTRITION' then 'Yes'
+			else 'No'
+		end as ABBOTT_PRODUCT,
+		'ITN & CATMAN' as NIELSEN_ABT_MEGA_CATEGORY,
+		'ITN & CATMAN' as NIELSEN_MEGA_CATG,
+		ABT_Subsegment as NIELSEN_SUBSEGMENT,
+		ABT_FLAVOR as NIELSEN_FLAVOR_GROUP,
+		ABT_Formula_Formulation as NIELSEN_FORMULATION,
+		case 
+			when ABT_Formula_Ty like '%UA%' or ABT_Formula_Ty like '%UP Age%' then 'Up Age'
+			when ABT_Formula_Ty = 'Prime' then 'Prime'
+			when ABT_Formula_Ty = 'Tolerance' then 'Tolerance'
+			when ABT_Formula_Ty = 'Specialty' and ABT_Formula_SubTy = 'Premature' then 'Premature'
+			when ABT_Formula_Ty = 'Specialty' and ABT_Formula_SubTy = 'Hydrolysate' then 'Hydrolysate'
+			when ABT_Formula_Ty = 'Specialty' and ABT_Formula_SubTy = 'Specialty' then 'Other Specialty'
+			else 'N/A'
+			end as [Formula Segment],
+		ABT_Manufacturer as Manufacturer,
+		ABT_Subbrand as Subbrand,
+		ABT_Subbrand as TMC_SUBBRAND_CUSTOM,
+		ABT_Manufacturer as TMC_MANUFACTURER,
+		case 
+			when ABT_Formula_Ty like '%UA%' or ABT_Formula_Ty like '%UP Age%' then 'Up Age'
+			when ABT_Formula_Ty = 'Prime' then 'Prime'
+			when ABT_Formula_Ty = 'Tolerance' then 'Tolerance'
+			when ABT_Formula_Ty = 'Specialty' and ABT_Formula_SubTy = 'Premature' then 'Premature'
+			when ABT_Formula_Ty = 'Specialty' and ABT_Formula_SubTy = 'Hydrolysate' then 'Hydrolysate'
+			when ABT_Formula_Ty = 'Specialty' and ABT_Formula_SubTy = 'Specialty' then 'Other Specialty'
+			else 'N/A'
+			end as TMC_FORMULA_SEGMENT,
+		case 
+			when ABT_Manufacturer = 'ABBOTT' then 'Yes'
+			when ABT_Manufacturer = 'ABBOTT NUTRITION' then 'Yes'
+			else 'No'
+		end as TMC_ABBOTT_PRODUCT,
+		'' as TMC_EQ_FACTOR,
+		case 
+			when ABT_Segment = 'BALANCED NUTRITION' then 'Adult'
+			when ABT_Segment =  'DIABETES NUTRITION' then 'Adult'
+			when ABT_Segment = 'TODDLER NUTRITION' then 'Toddler'
+			when ABT_Segment =  'ORAL ELECTROLYTES' then 'Toddler'
+			when ABT_Segment =  'INFANT FORMULA UA' then 'IFUA'
+			when ABT_Segment =  'IFUA' then ABT_Segment
+			when ABT_Segment =  'BN' then 'Adult'
+			when ABT_Segment =  'DN' then 'Adult'
+			when ABT_Segment =  'OES' then 'Toddler'
+			when ABT_Segment =  'TN' then 'Toddler'
+		end as TMC_INC_SHARE,
+		Item_Desc as TMC_ITEM_DESC,
+		'' as EACHES_PER_SCANNED_ITEM
+		
+from 	mitest.T_Niel_Extract_Item_ITN
+
+union 
+
+select	'GN'+ REVERSE(SUBSTRING(UPC,3,10)),
+		ABT_Brand,
+		case 
+			when ABT_Brand = 'Pediasure Excl Peptide' then 'Pediasure'
+			else ABT_Brand
+			end	as ABT_Brand_Family,
+		ABT_Category,
+		ABT_Fiber_Tn,
+		ABT_Flavor,
+		ABT_Form,
+		ABT_Formula_Formulation,
+		ABT_Formula_SubTy,
+		ABT_Formula_Ty,
+		ABT_Manufacturer,
+		ABT_Natural_Organic,
+		ABT_Pack,
+		ABT_Pack_Size,
+		case 
+			when ABT_Segment = 'BALANCED NUTRITION' then ABT_Segment
+			when ABT_Segment =  'DIABETES NUTRITION' then ABT_Segment
+			when ABT_Segment = 'TODDLER NUTRITION' then ABT_Segment
+			when ABT_Segment =  'ORAL ELECTROLYTES' then ABT_Segment
+			when ABT_Segment =  'INFANT FORMULA UA' then ABT_Segment
+			when ABT_Segment =  'IFUA' then 'INFANT FORMULA UA'
+			when ABT_Segment =  'BN' then 'BALANCED NUTRITION'
+			when ABT_Segment =  'DN' then 'DIABETES NUTRITION'
+			when ABT_Segment =  'OES' then 'ORAL ELECTROLYTES'
+			when ABT_Segment =  'TN' then 'TODDLER NUTRITION'
+		end as ABT_Segment,
+		ABT_Size_Range,
+		ABT_Subbrand,
+		ABT_Subbrand_Grp,
+		ABT_Subsegment,
+		ABT_Variant,
+		Brand_High,
+		Brand_Low,
+		Brand_Owner,
+		Brand_Owner_High,
+		Flavor,
+		Form,
+		Item_Desc,
+		Outer_Pack_Size,
+		Package_General_Shape,
+		Serving_Per_Container,
+		Serving_Size_Household,
+		Total_Size,
+		Yield,
+		ABT_Formula_Reb_NonReb,
+		ABT_Count_Size,
+		convert(int, ABT_Multi) as ABT_Multi,
+		'N/A' as Nielsen_ABT_Size,
+		'N/A' as Nielsen_ABT_Flavor_Group,
+		'N/A' as [ABT_Count Group (Form)], 
+		case 
+			when ABT_Segment = 'BALANCED NUTRITION' then 'Adult'
+			when ABT_Segment =  'DIABETES NUTRITION' then 'Adult'
+			when ABT_Segment = 'TODDLER NUTRITION' then 'Toddler'
+			when ABT_Segment =  'ORAL ELECTROLYTES' then 'Toddler'
+			when ABT_Segment =  'INFANT FORMULA UA' then 'IFUA'
+			when ABT_Segment =  'IFUA' then ABT_Segment
+			when ABT_Segment =  'BN' then 'Adult'
+			when ABT_Segment =  'DN' then 'Adult'
+			when ABT_Segment =  'OES' then 'Toddler'
+			when ABT_Segment =  'TN' then 'Toddler'
+		end as inc_share, 
+		case 
+			when ABT_Segment = 'BALANCED NUTRITION' then ABT_Segment
+			when ABT_Segment =  'DIABETES NUTRITION' then ABT_Segment
+			when ABT_Segment = 'TODDLER NUTRITION' then ABT_Segment
+			when ABT_Segment =  'ORAL ELECTROLYTES' then ABT_Segment
+			when ABT_Segment =  'INFANT FORMULA UA' then ABT_Segment
+			when ABT_Segment =  'IFUA' then 'INFANT FORMULA UA'
+			when ABT_Segment =  'BN' then 'BALANCED NUTRITION'
+			when ABT_Segment =  'DN' then 'DIABETES NUTRITION'
+			when ABT_Segment =  'OES' then 'ORAL ELECTROLYTES'
+			when ABT_Segment =  'TN' then 'TODDLER NUTRITION'
+		end as AN_SEGMENT, 
+		case 
+			when ABT_Formula_Reb_NonReb = 'REBATED' then 'Y'
+			when ABT_Formula_Reb_NonReb = 'NON-REBATED' then 'N'
+			else 'Non-Rebated'
+			end as AN_WIC_REBATE_PRODUCT,
+		ABT_Manufacturer as NIELSEN_ABT_MANUFACTURER,
+		ABT_Subbrand as AN_BRAND,
+		ABT_Form as NIELSEN_ABT_FORM,
+		Flavor as NIELSEN_ABT_FLAVOR,
+		Item_Desc as NIELSEN_DESCRIPTION,
+		ABT_Natural_Organic as NIELSEN_ORGANIC_CLAIM,
+		UPC as FULL_UPC,
+		'' as EQ_FACTOR,
+		case 
+			when ABT_Manufacturer = 'ABBOTT' then 'Yes'
+			when ABT_Manufacturer = 'ABBOTT NUTRITION' then 'Yes'
+			else 'No'
+		end as ABBOTT_PRODUCT,
+		'ITN & CATMAN' as NIELSEN_ABT_MEGA_CATEGORY,
+		'ITN & CATMAN' as NIELSEN_MEGA_CATG,
+		ABT_Subsegment as NIELSEN_SUBSEGMENT,
+		ABT_FLAVOR as NIELSEN_FLAVOR_GROUP,
+		ABT_Formula_Formulation as NIELSEN_FORMULATION,
+		case 
+			when ABT_Formula_Ty like '%UA%' or ABT_Formula_Ty like '%UP Age%' then 'Up Age'
+			when ABT_Formula_Ty = 'Prime' then 'Prime'
+			when ABT_Formula_Ty = 'Tolerance' then 'Tolerance'
+			when ABT_Formula_Ty = 'Specialty' and ABT_Formula_SubTy = 'Premature' then 'Premature'
+			when ABT_Formula_Ty = 'Specialty' and ABT_Formula_SubTy = 'Hydrolysate' then 'Hydrolysate'
+			when ABT_Formula_Ty = 'Specialty' and ABT_Formula_SubTy = 'Specialty' then 'Other Specialty'
+			else 'N/A'
+			end as [Formula Segment],
+		ABT_Manufacturer as Manufacturer,
+		ABT_Subbrand as Subbrand,
+		ABT_Subbrand as TMC_SUBBRAND_CUSTOM,
+		ABT_Manufacturer as TMC_MANUFACTURER,
+		case 
+			when ABT_Formula_Ty like '%UA%' or ABT_Formula_Ty like '%UP Age%' then 'Up Age'
+			when ABT_Formula_Ty = 'Prime' then 'Prime'
+			when ABT_Formula_Ty = 'Tolerance' then 'Tolerance'
+			when ABT_Formula_Ty = 'Specialty' and ABT_Formula_SubTy = 'Premature' then 'Premature'
+			when ABT_Formula_Ty = 'Specialty' and ABT_Formula_SubTy = 'Hydrolysate' then 'Hydrolysate'
+			when ABT_Formula_Ty = 'Specialty' and ABT_Formula_SubTy = 'Specialty' then 'Other Specialty'
+			else 'N/A'
+			end as TMC_FORMULA_SEGMENT,
+		case 
+			when ABT_Manufacturer = 'ABBOTT' then 'Yes'
+			when ABT_Manufacturer = 'ABBOTT NUTRITION' then 'Yes'
+			else 'No'
+		end as TMC_ABBOTT_PRODUCT,
+		'' as TMC_EQ_FACTOR,
+		case 
+			when ABT_Segment = 'BALANCED NUTRITION' then 'Adult'
+			when ABT_Segment =  'DIABETES NUTRITION' then 'Adult'
+			when ABT_Segment = 'TODDLER NUTRITION' then 'Toddler'
+			when ABT_Segment =  'ORAL ELECTROLYTES' then 'Toddler'
+			when ABT_Segment =  'INFANT FORMULA UA' then 'IFUA'
+			when ABT_Segment =  'IFUA' then ABT_Segment
+			when ABT_Segment =  'BN' then 'Adult'
+			when ABT_Segment =  'DN' then 'Adult'
+			when ABT_Segment =  'OES' then 'Toddler'
+			when ABT_Segment =  'TN' then 'Toddler'
+		end as TMC_INC_SHARE,
+		Item_Desc as TMC_ITEM_DESC,
+		'' as EACHES_PER_SCANNED_ITEM
+		
+from 	mitest.T_Niel_Extract_Item_ITN;
+
+
+DROP TABLE IF EXISTS #RV_Item;
+
+select 	 UPC_ASIN,
+		NIELSEN_BRAND,
+		case 
+			when AN_BRAND_FAMILY is NULL or AN_BRAND_FAMILY = 'N/A' then NIELSEN_BRAND
+			else AN_BRAND_FAMILY
+			end	as NIELSEN_ABT_BRAND_FAMILY,
+		NIELSEN_CATEGORY,
+		'N/A' as ABT_Fiber_Tn,
+		NIELSEN_FLAVOR,
+		NIELSEN_FORM,
+		NIELSEN_ABT_FORMULATION,
+		NIELSEN_FORMULASUBTYPE,
+		NIELSEN_ABT_FORMULA_TYPE,
+		NIELSEN_ABT_MANUFACTURER,
+		NIELSEN_ABT_NAT_ORG,
+		NIELSEN_ABT_PACK,
+		NIELSEN_PACK_SIZE,
+		case 
+			when NIELSEN_SEGMENT = 'BALANCED NUTRITION' then NIELSEN_SEGMENT
+			when NIELSEN_SEGMENT =  'DIABETES NUTRITION' then NIELSEN_SEGMENT
+			when NIELSEN_SEGMENT = 'TODDLER NUTRITION' then NIELSEN_SEGMENT
+			when NIELSEN_SEGMENT =  'ORAL ELECTROLYTES' then NIELSEN_SEGMENT
+			when NIELSEN_SEGMENT =  'INFANT FORMULA UA' then NIELSEN_SEGMENT
+			when NIELSEN_SEGMENT =  'IFUA' then 'INFANT FORMULA UA'
+			when NIELSEN_SEGMENT =  'BN' then 'BALANCED NUTRITION'
+			when NIELSEN_SEGMENT =  'DN' then 'DIABETES NUTRITION'
+			when NIELSEN_SEGMENT =  'OES' then 'ORAL ELECTROLYTES'
+			when NIELSEN_SEGMENT =  'TN' then 'TODDLER NUTRITION'
+		end as NIELSEN_SEGMENT,
+		ABT_SIZE_RANGE,
+		NIELSEN_SUBBRAND,
+		NIELSEN_ABT_SUBBRAND_GROUP,
+		NIELSEN_ABT_SUBSEGMENT,
+		NIELSEN_VARIANT,
+		'N/A' as Brand_High,
+		NIELSEN_BRANDLOW as Brand_Low,
+		'N/A' as Brand_Owner,
+		'N/A' as Brand_Owner_High,
+		AN_FLAVOR,
+		AN_FORM,
+		ITEM_DESC,
+		'N/A' as Outer_Pack_Size,
+		'N/A' as Package_General_Shape,
+		NIELSEN_ABT_CONTAINER,
+		'N/A' as Serving_Size_Household,
+		'N/A' as Total_Size,
+		'N/A' as Yield,
+		coalesce(a.Rebate, NIELSEN_ABT_REBATE) as NIELSEN_ABT_REBATE, --Note: Logic to update status to NON-REBATED for Amazon resides in the Ingestion
+		ABT_COUNT_SIZE,
+		convert(int, ABT_MULTI) as ABT_MULTI,
+		Nielsen_ABT_Size,
+		Nielsen_ABT_Flavor_Group,
+		'' as [ABT_Count Group (Form)],  
+		case 
+			when NIELSEN_SEGMENT = 'BALANCED NUTRITION' then 'Adult'
+			when NIELSEN_SEGMENT =  'DIABETES NUTRITION' then 'Adult'
+			when NIELSEN_SEGMENT = 'TODDLER NUTRITION' then 'Toddler'
+			when NIELSEN_SEGMENT =  'ORAL ELECTROLYTES' then 'Toddler'
+			when NIELSEN_SEGMENT =  'INFANT FORMULA UA' then 'IFUA'
+			when NIELSEN_SEGMENT =  'IFUA' then NIELSEN_SEGMENT
+			when NIELSEN_SEGMENT =  'BN' then 'Adult'
+			when NIELSEN_SEGMENT =  'DN' then 'Adult'
+			when NIELSEN_SEGMENT =  'OES' then 'Toddler'
+			when NIELSEN_SEGMENT =  'TN' then 'Toddler'
+		end as inc_share,  
+		case 
+			when NIELSEN_SEGMENT = 'BALANCED NUTRITION' then NIELSEN_SEGMENT
+			when NIELSEN_SEGMENT =  'DIABETES NUTRITION' then NIELSEN_SEGMENT
+			when NIELSEN_SEGMENT = 'TODDLER NUTRITION' then NIELSEN_SEGMENT
+			when NIELSEN_SEGMENT =  'ORAL ELECTROLYTES' then NIELSEN_SEGMENT
+			when NIELSEN_SEGMENT =  'INFANT FORMULA UA' then NIELSEN_SEGMENT
+			when NIELSEN_SEGMENT =  'IFUA' then 'INFANT FORMULA UA'
+			when NIELSEN_SEGMENT =  'BN' then 'BALANCED NUTRITION'
+			when NIELSEN_SEGMENT =  'DN' then 'DIABETES NUTRITION'
+			when NIELSEN_SEGMENT =  'OES' then 'ORAL ELECTROLYTES'
+			when NIELSEN_SEGMENT =  'TN' then 'TODDLER NUTRITION'
+		end as ABT_Segment, --equivalent to ABT_Segment 
+		AN_WIC_REBATE_PRODUCT,
+		NIELSEN_MANUFACTURER,
+		case
+			when AN_BRAND is not NULL then AN_BRAND
+			else NIELSEN_SUBBRAND
+			end as AN_BRAND,
+		NIELSEN_ABT_FORM,
+		NIELSEN_ABT_FLAVOR,
+		NIELSEN_DESCRIPTION,
+		NIELSEN_ORGANIC_CLAIM,
+		FULL_UPC,
+		r.EQ_FACTOR,
+		ABBOTT_PRODUCT,
+		NIELSEN_ABT_MEGA_CATEGORY,
+		NIELSEN_MEGA_CATG,
+		NIELSEN_SUBSEGMENT,
+		NIELSEN_FLAVOR_GROUP,
+		NIELSEN_FORMULATION,
+		case 
+			when NIELSEN_FORMULA_TYPE like '%UA%' or NIELSEN_FORMULA_TYPE like '%UP Age%' then 'Up Age'
+			when NIELSEN_FORMULA_TYPE = 'Prime' then 'Prime'
+			when NIELSEN_FORMULA_TYPE = 'Tolerance' then 'Tolerance'
+			when NIELSEN_FORMULA_TYPE = 'Specialty' and NIELSEN_FORMULASUBTYPE = 'Premature' then 'Premature'
+			when NIELSEN_FORMULA_TYPE = 'Specialty' and NIELSEN_FORMULASUBTYPE = 'Hydrolysate' then 'Hydrolysate'
+			when NIELSEN_FORMULA_TYPE = 'Specialty' and NIELSEN_FORMULASUBTYPE = 'Specialty' then 'Other Specialty'
+			else 'N/A'
+			end as [Formula Segment],
+		NIELSEN_ABT_MANUFACTURER as Manufacturer, 
+		NIELSEN_ABT_MANUFACTURER as TMC_MANUFACTURER, 
+		case 
+			when NIELSEN_FORMULA_TYPE like '%UA%' or NIELSEN_FORMULA_TYPE like '%UP Age%' then 'Up Age'
+			when NIELSEN_FORMULA_TYPE = 'Prime' then 'Prime'
+			when NIELSEN_FORMULA_TYPE = 'Tolerance' then 'Tolerance'
+			when NIELSEN_FORMULA_TYPE = 'Specialty' and NIELSEN_FORMULASUBTYPE = 'Premature' then 'Premature'
+			when NIELSEN_FORMULA_TYPE = 'Specialty' and NIELSEN_FORMULASUBTYPE = 'Hydrolysate' then 'Hydrolysate'
+			when NIELSEN_FORMULA_TYPE = 'Specialty' and NIELSEN_FORMULASUBTYPE = 'Specialty' then 'Other Specialty'
+			else 'N/A'
+			end as TMC_Formula_Segment,
+		ABBOTT_PRODUCT as TMC_ABBOTT_PRODUCT, 
+		r.EQ_Factor as TMC_EQ_FACTOR, 
+		case 
+			when NIELSEN_SEGMENT = 'BALANCED NUTRITION' then 'Adult'
+			when NIELSEN_SEGMENT =  'DIABETES NUTRITION' then 'Adult'
+			when NIELSEN_SEGMENT = 'TODDLER NUTRITION' then 'Toddler'
+			when NIELSEN_SEGMENT =  'ORAL ELECTROLYTES' then 'Toddler'
+			when NIELSEN_SEGMENT =  'INFANT FORMULA UA' then 'IFUA'
+			when NIELSEN_SEGMENT =  'IFUA' then NIELSEN_SEGMENT
+			when NIELSEN_SEGMENT =  'BN' then 'Adult'
+			when NIELSEN_SEGMENT =  'DN' then 'Adult'
+			when NIELSEN_SEGMENT =  'OES' then 'Toddler'
+			when NIELSEN_SEGMENT =  'TN' then 'Toddler'
+		end as TMC_INC_SHARE, 
+		coalesce(ITEM_DESC,NIELSEN_DESCRIPTION) as TMC_ITEM_DESC,  
+		EACHES_PER_SCANNED_ITEM
+		
+into 	#RV_Item
+
+from mitest.RV_Item r
+    left join mitest.T_Amazon a
+        on r.UPC_ASIN = a.UPC;
+
+
+/**************************************************************************************************************************************
+
+--B.                            Combining Nielsen and RV into a single dataset
+
+**************************************************************************************************************************************/
+
+DROP TABLE IF EXISTS #RV_Nielsen_Combined; --Need to validate Nielsen & RV attribute pairings
+
+select	 coalesce(r.UPC_ASIN,n.UPC) as UPC, 													--imperative to keep in this order unlike the rest
+		coalesce(n.ABT_Brand,r.NIELSEN_BRAND) as ABT_Brand,
+		coalesce(n.ABT_Brand_Family, r.NIELSEN_ABT_BRAND_FAMILY) as ABT_Brand_Family,
+		coalesce(n.ABT_Category, r.NIELSEN_CATEGORY) as ABT_Category,
+		coalesce(n.ABT_Fiber_Tn, r.ABT_Fiber_Tn) as ABT_Fiber_Tn,
+		coalesce(n.ABT_Flavor, r.NIELSEN_FLAVOR) as ABT_Flavor,
+		coalesce(n.ABT_Form, r.NIELSEN_FORM) as ABT_Form,
+		coalesce(n.ABT_Formula_Formulation, r.NIELSEN_ABT_FORMULATION) as ABT_Formula_Formulation,
+		coalesce(n.ABT_Formula_SubTy, r.NIELSEN_FORMULASUBTYPE) as ABT_Formula_SubTy,
+		coalesce(n.ABT_Formula_Ty, r.NIELSEN_ABT_FORMULA_TYPE) as ABT_Formula_Ty,
+		coalesce(n.ABT_Manufacturer, r.NIELSEN_ABT_MANUFACTURER) as ABT_Manufacturer,
+		coalesce(n.ABT_Natural_Organic, r.NIELSEN_ABT_NAT_ORG) as ABT_Natural_Organic,
+		coalesce(n.ABT_Pack, r.NIELSEN_ABT_PACK) as ABT_Pack,
+		coalesce(n.ABT_Pack_Size, r.NIELSEN_Pack_SIZE) as ABT_Pack_Size,
+		coalesce(n.ABT_Segment, r.ABT_SEGMENT) as ABT_Segment,
+		coalesce(n.ABT_Size_Range, r.ABT_SIZE_RANGE) as ABT_Size_Range,
+		coalesce(n.ABT_Subbrand, r.NIELSEN_SUBBRAND) as ABT_Subbrand, 
+		coalesce(n.ABT_Subbrand_Grp, r.NIELSEN_ABT_SUBBRAND_GROUP) as ABT_Subbrand_Grp,
+		coalesce(n.ABT_Subsegment, r.NIELSEN_ABT_SUBSEGMENT) as ABT_Subsegment,
+		coalesce(n.ABT_Variant, r.NIELSEN_VARIANT) as ABT_Variant,
+		coalesce(n.Brand_High, r.Brand_High) as Brand_High, 
+		coalesce(n.Brand_Low, r.Brand_Low) as Brand_Low,
+		coalesce(n.Brand_Owner, r.Brand_Owner) as Brand_Owner,
+		coalesce(n.Brand_Owner_High, r.Brand_Owner_High) as Brand_Owner_High,
+		coalesce(n.Flavor, r.AN_FLAVOR) as Flavor,
+		coalesce(r.AN_Form, n.FORM) as Form,  												--pull velocity AN_Form first, then Nielsen if null
+		coalesce(r.ITEM_DESC, n.Item_Desc) as Item_Desc, 									--imperative to keep in this order unlike the rest
+		coalesce(n.Outer_Pack_Size, r.Outer_Pack_Size) as Outer_Pack_Size,
+		coalesce(n.Package_General_Shape, r.Package_General_Shape) as Package_General_Shape,
+		coalesce(n.Serving_Per_Container, r.NIELSEN_ABT_CONTAINER) as Serving_Per_Container,
+		coalesce(n.Serving_Size_Household, r.Serving_Size_Household) as Serving_Size_Household,
+		coalesce(n.Total_Size, r.Total_Size) as Total_Size,
+		coalesce(n.Yield, r.Yield) as Yield,
+		coalesce(r.NIELSEN_ABT_REBATE, n.ABT_Formula_Reb_NonReb) as ABT_Formula_Reb_NonReb, --imperative to keep in this order unlike the rest
+		coalesce(n.ABT_Count_Size, r.ABT_COUNT_SIZE) as ABT_Count_Size,
+		coalesce(n.ABT_Multi, r.ABT_MULTI) as ABT_Multi,
+		coalesce(n.Nielsen_ABT_Size, r.Nielsen_ABT_Size) as Nielsen_ABT_Size,
+		coalesce(n.Nielsen_ABT_Flavor_Group, r.Nielsen_ABT_Flavor_Group) as Nielsen_ABT_Flavor_Group,
+		coalesce(n.[ABT_Count Group (Form)], r.[ABT_Count Group (Form)]) as [ABT_Count Group (Form)],
+		coalesce(n.inc_share, r.inc_share) as inc_share,
+		coalesce(n.ABT_Segment,r.ABT_SEGMENT) as AN_Segment, 
+		coalesce(n.AN_WIC_REBATE_PRODUCT, r.AN_WIC_REBATE_PRODUCT) as AN_WIC_REBATE_PRODUCT,
+		coalesce(n.ABT_MANUFACTURER,r.NIELSEN_ABT_MANUFACTURER) as NIELSEN_MANUFACTURER,
+		coalesce(r.AN_BRAND, n.AN_BRAND) as AN_BRAND, 										--pull velocity AN_Brand first, then Nielsen if null
+		coalesce(n.NIELSEN_ABT_FORM, r.NIELSEN_ABT_FORM) as NIELSEN_ABT_FORM,
+		coalesce(n.NIELSEN_ABT_FLAVOR, r.NIELSEN_ABT_FLAVOR) as NIELSEN_ABT_FLAVOR,
+		coalesce(n.Item_Desc,r.NIELSEN_DESCRIPTION) as NIELSEN_DESCRIPTION,
+		coalesce(r.NIELSEN_ORGANIC_CLAIM, n.NIELSEN_ORGANIC_CLAIM) as NIELSEN_ORGANIC_CLAIM,
+		coalesce(n.ABT_Natural_Organic, r.NIELSEN_ABT_NAT_ORG) as NIELSEN_ABT_NAT_ORG,
+		coalesce(n.UPC,r.FULL_UPC) as FULL_UPC,
+		coalesce(n.EQ_FACTOR, r.EQ_FACTOR) as EQ_FACTOR,
+		coalesce(n.ABBOTT_PRODUCT, r.ABBOTT_PRODUCT) as ABBOTT_PRODUCT,
+		coalesce(n.NIELSEN_ABT_MEGA_CATEGORY, r.NIELSEN_ABT_MEGA_CATEGORY) as NIELSEN_ABT_MEGA_CATEGORY,
+		coalesce(n.NIELSEN_MEGA_CATG, r.NIELSEN_MEGA_CATG) as NIELSEN_MEGA_CATG,
+		coalesce(n.ABT_Subsegment,r.NIELSEN_SUBSEGMENT) as NIELSEN_SUBSEGMENT,
+		coalesce(n.NIELSEN_FLAVOR_GROUP, r.NIELSEN_FLAVOR_GROUP) as NIELSEN_FLAVOR_GROUP,
+		coalesce(n.NIELSEN_FORMULATION, r.NIELSEN_FORMULATION) as NIELSEN_FORMULATION,
+		coalesce(n.[Formula Segment], r.[Formula Segment]) as [Formula Segment],
+		coalesce(n.ABT_MANUFACTURER,r.NIELSEN_ABT_MANUFACTURER) as Manufacturer,
+		'' Subbrand,
+		'' as TMC_SUBBRAND_CUSTOM,
+		coalesce(n.ABT_Manufacturer, r.NIELSEN_ABT_MANUFACTURER) as TMC_MANUFACTURER,
+		coalesce(n.TMC_FORMULA_SEGMENT, r.TMC_FORMULA_SEGMENT) as TMC_FORMULA_SEGMENT,
+		coalesce(n.TMC_ABBOTT_PRODUCT, r.TMC_ABBOTT_PRODUCT) as TMC_ABBOTT_PRODUCT,
+		coalesce(r.TMC_EQ_FACTOR, n.TMC_EQ_FACTOR) as TMC_EQ_FACTOR,					--pull velocity EQ_FACTOR first, then Nielsen (blank) if null
+		coalesce(n.TMC_INC_SHARE, r.TMC_INC_SHARE) as TMC_INC_SHARE,
+		coalesce(r.ITEM_DESC, n.Item_Desc) as TMC_ITEM_DESC, 							--imperative to keep in this order unlike the rest
+		coalesce(n.EACHES_PER_SCANNED_ITEM, r.EACHES_PER_SCANNED_ITEM) as EACHES_PER_SCANNED_ITEM
+
+into 	#RV_Nielsen_Combined
+
+from #RV_Item r
+    full join 
+        (select upc_asin, nielsen_upc --upc-to-asin mapping: for use with Rule2
+         from mitest.RV_Item 
+         where upc_asin like 'B%' and nielsen_upc <> '000000000000'
+         group by upc_asin, nielsen_upc) as r2
+            on r.UPC_ASIN = r2.UPC_ASIN
+
+    full join #Nielsen_Item_Master n
+        on case 
+            when r.upc_asin = n.upc then '1' --B1: When UPC exists in both, Apply Nielsen UPC item attributes (Nielsen always wins... unless incorrect & we override)
+            when r.upc_asin like 'B%' and n.upc is null then '1' --B2: When there's no UPC mapping i.e. Amzn only, apply RV item attributes
+            when r.upc_asin like 'B%' and r2.nielsen_upc = n.upc then '1' --B3: When UPC-to-ASIN exists, then apply Nielsen UPC item attributes to ASIN(s)
+           end = 1;
+
+/**************************************************************************************************************************************
+
+--C.                                  Initial Item Master table load
+
+**************************************************************************************************************************************/
+
+INSERT INTO mitest.T_Item_Master (UPC_ASIN,ABT_BRAND,ABT_BRAND_FAMILY,ABT_CATEGORY,ABT_Fiber_Tn,ABT_FLAVOR, ABT_FORM,ABT_Formula_Formulation,ABT_Formula_SubTy,ABT_Formula_Ty,ABT_Manufacturer,ABT_Natural_Organic,ABT_Pack,ABT_Pack_Size,ABT_Segment,ABT_Size_Range,ABT_Subbrand,ABT_Subbrand_Grp,ABT_Subsegment,ABT_Variant,Brand_High,Brand_Low,Brand_Owner,Brand_Owner_High,Flavor,Form,Item_Desc,Outer_Pack_Size,Package_General_Shape,Serving_Per_Container,Serving_Size_Household,Total_Size,	Yield,ABT_Formula_Reb_NonReb,ABT_Count_Size,ABT_Multi,Nielsen_ABT_Size,Nielsen_ABT_Flavor_Group,[ABT_Count Group (Form)],inc_share, AN_SEGMENT, AN_WIC_REBATE_PRODUCT,NIELSEN_MANUFACTURER, AN_BRAND,	NIELSEN_ABT_FORM,	NIELSEN_ABT_FLAVOR,	NIELSEN_DESCRIPTION, NIELSEN_ORGANIC_CLAIM,	NIELSEN_ABT_NAT_ORG, FULL_UPC,	EQ_FACTOR,	ABBOTT_PRODUCT,	NIELSEN_ABT_MEGA_CATEGORY,	NIELSEN_MEGA_CATG,	NIELSEN_SUBSEGMENT,	NIELSEN_FLAVOR_GROUP,	NIELSEN_FORMULATION,	[Formula Segment],	Manufacturer, Subbrand,	TMC_SUBBRAND_CUSTOM,	TMC_MANUFACTURER,	TMC_FORMULA_SEGMENT,	TMC_ABBOTT_PRODUCT,	TMC_EQ_FACTOR,	TMC_INC_SHARE,	TMC_ITEM_DESC,EACHES_PER_SCANNED_ITEM)
+
+select distinct a.* 
+from #RV_Nielsen_Combined a
+    join mitest.T_Consumption b
+        on a.UPC = b.UPC;  --must have sales
+        
+
+
+/**************************************************************************************************************************************
+
+--E.                                  Build T_Consumption_Char 
+
+**************************************************************************************************************************************/
+
+DROP TABLE IF EXISTS mitest.T_Consumption_Char_t; --clear table
+
+SELECT	UPC as UPC,
+		Upper(AN_SEGMENT) as AN_SEGMENT,
+		Upper(NIELSEN_SEGMENT) as NIELSEN_SEGMENT,
+		mida_data.ProperCase(NIELSEN_ABT_SUBSEGMENT) as NIELSEN_ABT_SUBSEGMENT,
+		mida_data.ProperCase(AN_WIC_REBATE_PRODUCT) as AN_WIC_REBATE_PRODUCT,
+		mida_data.ProperCase(NIELSEN_ABT_REBATE) as NIELSEN_ABT_REBATE,
+		mida_data.ProperCase(NIELSEN_MANUFACTURER) as NIELSEN_MANUFACTURER,
+		mida_data.ProperCase(NIELSEN_ABT_MANUFACTURER) as NIELSEN_ABT_MANUFACTURER,
+		mida_data.ProperCase(AN_BRAND_FAMILY) as AN_BRAND_FAMILY,
+		mida_data.ProperCase(AN_BRAND) as AN_BRAND,
+		mida_data.ProperCase(AN_FORM) as AN_FORM,
+		mida_data.ProperCase(AN_FLAVOR) as AN_FLAVOR,
+		mida_data.ProperCase(NIELSEN_ABT_FORM) as NIELSEN_ABT_FORM,
+		mida_data.ProperCase(NIELSEN_ABT_FLAVOR) as NIELSEN_ABT_FLAVOR,
+		mida_data.ProperCase(NIELSEN_FORM) as NIELSEN_FORM,
+		mida_data.ProperCase(NIELSEN_FLAVOR) as NIELSEN_FLAVOR,
+		mida_data.ProperCase(NIELSEN_FORMULA_TYPE) as NIELSEN_FORMULA_TYPE,
+		mida_data.ProperCase(NIELSEN_FORMULASUBTYPE) as NIELSEN_FORMULASUBTYPE,
+		mida_data.ProperCase([ABT_Size Range]) as "ABT_SIZE RANGE",
+		mida_data.ProperCase(NIELSEN_CATEGORY) as NIELSEN_CATEGORY,
+		mida_data.ProperCase(ITEM_DESC) as ITEM_DESC,
+		mida_data.ProperCase(NIELSEN_DESCRIPTION) as NIELSEN_DESCRIPTION,
+		mida_data.ProperCase(NIELSEN_BRAND) as NIELSEN_BRAND,
+		mida_data.ProperCase(NIELSEN_SUBBRAND) as NIELSEN_SUBBRAND,
+		mida_data.ProperCase(NIELSEN_BRANDLOW) as NIELSEN_BRANDLOW,
+		mida_data.ProperCase(NIELSEN_PACK_SIZE) as NIELSEN_PACK_SIZE,
+		mida_data.ProperCase(NIELSEN_ORGANIC_CLAIM) as NIELSEN_ORGANIC_CLAIM,
+		mida_data.ProperCase(NIELSEN_ABT_NAT_ORG) as NIELSEN_ABT_NAT_ORG,
+		mida_data.ProperCase(NIELSEN_ABT_FORMULA_TYPE) as NIELSEN_ABT_FORMULA_TYPE,
+		mida_data.ProperCase(FULL_UPC) as FULL_UPC,
+		EQ_FACTOR as EQ_FACTOR,
+		mida_data.ProperCase(ABBOTT_PRODUCT) as ABBOTT_PRODUCT,
+		mida_data.ProperCase(NIELSEN_ABT_MEGA_CATEGORY) as NIELSEN_ABT_MEGA_CATEGORY,
+		mida_data.ProperCase(Nielsen_ABT_Size) as NIELSEN_ABT_SIZE,
+		mida_data.ProperCase(NIELSEN_ABT_CONTAINER) as NIELSEN_ABT_CONTAINER,
+		mida_data.ProperCase(Nielsen_ABT_Flavor_Group) as NIELSEN_ABT_FLAVOR_GROUP,
+		mida_data.ProperCase(NIELSEN_ABT_PACK) as NIELSEN_ABT_PACK,
+		mida_data.ProperCase(NIELSEN_ABT_FORMULATION) as NIELSEN_ABT_FORMULATION,
+		mida_data.ProperCase(NIELSEN_MEGA_CATG) as NIELSEN_MEGA_CATG,
+		mida_data.ProperCase(NIELSEN_SUBSEGMENT) as NIELSEN_SUBSEGMENT,
+		mida_data.ProperCase(NIELSEN_FLAVOR_GROUP) as NIELSEN_FLAVOR_GROUP,
+		mida_data.ProperCase(NIELSEN_FORMULATION) as NIELSEN_FORMULATION,
+		mida_data.ProperCase(NIELSEN_VARIANT) as NIELSEN_VARIANT,
+		mida_data.ProperCase(EACHES_PER_SCANNED_ITEM) as EACHES_PER_SCANNED_ITEM,
+		mida_data.ProperCase(ABT_Count_Size) as "ABT_COUNT SIZE",
+		mida_data.ProperCase(ABT_Multi) as ABT_MULTI,
+		mida_data.ProperCase(Formula_Segment) as "Formula Segment",
+		mida_data.ProperCase(Manufacturer) as Manufacturer,
+		mida_data.ProperCase(inc_share) as inc_share,
+		mida_data.ProperCase(TMC_SUBBRAND_CUSTOM) as Subbrand,
+		mida_data.ProperCase(ABT_BRAND) as ABT_BRAND,
+		mida_data.ProperCase(ABT_Subbrand) as ABT_SUBBRAND,
+		mida_data.ProperCase(ABT_FORM) as ABT_FORM,
+		mida_data.ProperCase(ABT_FLAVOR) as ABT_FLAVOR,
+		mida_data.ProperCase(ABT_Manufacturer) as ABT_MANUFACTURER,
+		mida_data.ProperCase(ABT_FORMULA_TYPE) AS "ABT_FORMULA TYPE",
+		mida_data.ProperCase(ABT_FORMULA_SUBTYPE) AS "ABT_FORMULA SUBTYPE",
+		mida_data.ProperCase(TMC_SUBBRAND_CUSTOM) as TMC_SUBBRAND_CUSTOM,
+		mida_data.ProperCase(TMC_MANUFACTURER) as TMC_MANUFACTURER,
+		mida_data.ProperCase(TMC_FORMULA_SEGMENT) as TMC_FORMULA_SEGMENT,
+		mida_data.ProperCase(TMC_ABBOTT_PRODUCT) as TMC_ABBOTT_PRODUCT,
+		mida_data.ProperCase(ABT_FORMULA_REB_NON_REBATED) as ABT_FORMULA_REB_NON_REBATED,
+		mida_data.ProperCase(TMC_EQ_FACTOR) as TMC_EQ_FACTOR,
+		mida_data.ProperCase(TMC_INC_SHARE) as TMC_INC_SHARE,
+		mida_data.ProperCase(TMC_ITEM_DESC) as TMC_ITEM_DESC,
+		mida_data.ProperCase(ABT_Natural_Organic) as ABT_NATURAL_ORGANIC,
+		Upper(ABT_Segment) as ABT_SEGMENT
+
+INTO mitest.T_Consumption_Char_t
+
+FROM	(SELECT UPC_ASIN as UPC,
+				ABT_SEGMENT as AN_SEGMENT,
+				ABT_SEGMENT as NIELSEN_SEGMENT,
+				ABT_Subsegment as NIELSEN_ABT_SUBSEGMENT,
+				ABT_Formula_Reb_NonReb as AN_WIC_REBATE_PRODUCT,
+				ABT_Formula_Reb_NonReb as NIELSEN_ABT_REBATE,
+				NIELSEN_MANUFACTURER as NIELSEN_MANUFACTURER,
+				NIELSEN_MANUFACTURER as NIELSEN_ABT_MANUFACTURER,
+				ABT_BRAND_FAMILY as AN_BRAND_FAMILY,
+				AN_BRAND as AN_BRAND,
+				Form as AN_FORM,
+				Flavor as AN_FLAVOR,
+				ABT_FORM as NIELSEN_ABT_FORM,
+				ABT_FLAVOR as NIELSEN_ABT_FLAVOR,
+				ABT_FORM as NIELSEN_FORM,
+				NIELSEN_FLAVOR as NIELSEN_FLAVOR,
+				ABT_Formula_Ty as NIELSEN_FORMULA_TYPE,
+				ABT_Formula_SubTy as NIELSEN_FORMULASUBTYPE,
+				ABT_Size_Range as "ABT_SIZE RANGE",
+				ABT_CATEGORY as NIELSEN_CATEGORY,
+				Item_Desc as ITEM_DESC,
+				NIELSEN_DESCRIPTION as NIELSEN_DESCRIPTION,
+				NIELSEN_BRAND as NIELSEN_BRAND,
+				ABT_Subbrand as NIELSEN_SUBBRAND,
+				Brand_Low as NIELSEN_BRANDLOW,
+				ABT_Pack_Size as NIELSEN_PACK_SIZE,
+				NIELSEN_ORGANIC_CLAIM as NIELSEN_ORGANIC_CLAIM,
+				NIELSEN_ABT_NAT_ORG as NIELSEN_ABT_NAT_ORG,
+				ABT_Formula_Ty as NIELSEN_ABT_FORMULA_TYPE,
+				FULL_UPC as FULL_UPC,
+				EQ_FACTOR as EQ_FACTOR,
+				ABBOTT_PRODUCT as ABBOTT_PRODUCT,
+				NIELSEN_ABT_MEGA_CATEGORY as NIELSEN_ABT_MEGA_CATEGORY,
+				Nielsen_ABT_Size as NIELSEN_ABT_SIZE,
+				NIELSEN_ABT_CONTAINER as NIELSEN_ABT_CONTAINER,
+				Nielsen_ABT_Flavor_Group as NIELSEN_ABT_FLAVOR_GROUP,
+				ABT_Pack as NIELSEN_ABT_PACK,
+				ABT_Formula_Formulation as NIELSEN_ABT_FORMULATION,
+				NIELSEN_MEGA_CATG as NIELSEN_MEGA_CATG,
+				NIELSEN_SUBSEGMENT as NIELSEN_SUBSEGMENT,
+				NIELSEN_FLAVOR_GROUP as NIELSEN_FLAVOR_GROUP,
+				NIELSEN_FORMULATION as NIELSEN_FORMULATION,
+				ABT_Variant as NIELSEN_VARIANT,
+				EACHES_PER_SCANNED_ITEM as EACHES_PER_SCANNED_ITEM,
+				ABT_Count_Size as "ABT_COUNT_SIZE",
+				ABT_Multi as ABT_MULTI,
+				[Formula Segment] as "Formula_Segment",
+				Manufacturer as Manufacturer,
+				inc_share as inc_share,
+				ABT_BRAND as ABT_BRAND,
+				ABT_Subbrand as ABT_SUBBRAND,
+				ABT_FORM as ABT_FORM,
+				ABT_FLAVOR as ABT_FLAVOR,
+				ABT_Manufacturer as ABT_MANUFACTURER,
+				ABT_Formula_Ty as "ABT_FORMULA_TYPE",
+				ABT_Formula_SubTy as "ABT_FORMULA_SUBTYPE",
+				case	when ABT_Segment = 'ORAL ELECTROLYTES' and ABT_Subbrand = 'PDL Advanced Care+' and FORM IN ('Assorted', 'NOT APPLICABLE') then 'Adv Care+ Club Pack'
+						when ABT_Segment = 'ORAL ELECTROLYTES' and AN_BRAND = 'PDL Base' and NIELSEN_ABT_FORM = 'Liquid' then 'Base Liter'
+						when ABT_Segment = 'ORAL ELECTROLYTES' and ABT_Subbrand = 'PDL Base' and NIELSEN_ABT_FORM = 'Liquid' then 'Base Liter'
+						when ABT_Segment = 'ORAL ELECTROLYTES' and ABT_Subbrand IN ('Pedialyte AdvancedCare +', 'PDL Advanced Care+') and NIELSEN_ABT_FORM = 'Powder' then 'Adv Care+ Pwd' --NEW
+						when ABT_Segment = 'ORAL ELECTROLYTES' and ABT_Subbrand = 'PDL Advanced Care' and NIELSEN_ABT_FORM IN ('Liquid', 'Ready to Drink','RTD') then 'Adv Care Liter'
+						when ABT_Segment = 'ORAL ELECTROLYTES' and ABT_Subbrand = 'PDL Advanced Care+' and NIELSEN_ABT_FORM IN ('Liquid', 'Ready to Drink','RTD') then 'Adv Care+ Liter'
+						when ABT_Segment = 'ORAL ELECTROLYTES' and ABT_Subbrand = 'PDL Base' and NIELSEN_ABT_FORM IN ('Powder') then 'Base Powder'
+						when ABT_Segment = 'ORAL ELECTROLYTES' and ABT_Subbrand = 'PDL Sparkling Rush' and NIELSEN_ABT_FORM = 'Powder' then 'Sparkling Pwd'
+						when ABT_Segment = 'ORAL ELECTROLYTES' and ABT_Subbrand = 'PDL Organic' then 'PDL Organic'
+						when ABT_Segment = 'ORAL ELECTROLYTES' and ABT_Subbrand = 'PDL Sport' and NIELSEN_ABT_FORM IN ('Liquid', 'Ready to Drink','RTD') then 'Sport Liter'
+						when ABT_Segment = 'ORAL ELECTROLYTES' and ABT_Subbrand = 'PDL Sport' and NIELSEN_ABT_FORM = 'Powder' then 'Sport Pwd'
+						when ABT_Segment = 'ORAL ELECTROLYTES' and ABT_Subbrand = 'PDL Zero Sugar' then 'Zero Sugar'
+						when ABT_Segment = 'ORAL ELECTROLYTES' and ABT_Subbrand = 'PDL Immune Support' and NIELSEN_ABT_FORM = 'Powder' then 'Immune Support Pwd'
+						when ABT_Segment = 'ORAL ELECTROLYTES' and ABT_Subbrand = 'PDL Base' and NIELSEN_ABT_FORM = 'Frz Pops' then 'Frz Pops'
+						when ABT_Segment = 'ORAL ELECTROLYTES' and ABT_Subbrand = 'Pvt Lbl Rem Sbbr' then 'Pvt Lbl OES'
+						when ABT_Segment = 'ORAL ELECTROLYTES' and ABT_Subbrand = 'Rem Sbbr' then 'All Other OES'
+						when ABT_Segment = 'ORAL ELECTROLYTES' and ABT_Subbrand = 'PDL Immune Support' and NIELSEN_ABT_FORM IN ('Liquid', 'Ready to Drink','RTD') then 'Immune Support Liter'
+						when ABT_Segment = 'TODDLER NUTRITION' and ABT_Subbrand = 'PDS With Fiber' then 'PDS Fiber'
+						when ABT_Segment = 'TODDLER NUTRITION' and ABT_Subbrand = 'PDS Base' and NIELSEN_ABT_FORM = 'Liquid' then 'PDS Base RTD'
+						when ABT_Segment = 'TODDLER NUTRITION' and ABT_Subbrand = 'PDS Sidekicks' then 'PDS Sidekicks'
+						when ABT_Segment = 'TODDLER NUTRITION' and ABT_Subbrand = 'PDS Base' and NIELSEN_ABT_FORM = 'Powder' then 'PDS Powder'
+						when ABT_Segment = 'TODDLER NUTRITION' and ABT_Subbrand = 'PDS Base Original' and NIELSEN_ABT_FORM = 'Powder' then 'PDS Powder'
+						when ABT_Segment = 'TODDLER NUTRITION' and ABT_Subbrand = 'PDS Base Organic' and NIELSEN_ABT_FORM = 'Powder' then 'PDS Powder'
+						when ABT_Segment = 'TODDLER NUTRITION' and ABT_Subbrand = 'PDS Base Organic' and NIELSEN_ABT_FORM IN ('Liquid', 'Ready to Drink','RTD') then 'PDS Organic'
+						when ABT_Segment = 'TODDLER NUTRITION' and ABT_Subbrand = 'PDS Base Original' and NIELSEN_ABT_FORM IN ('Liquid', 'Ready to Drink','RTD') then 'PDS Base RTD'
+						when ABT_Segment = 'TODDLER NUTRITION' and ABT_Subbrand in ('Rem Sbbr','Pds Harvest') then 'All Other TN'		
+						when ABT_Segment = 'TODDLER NUTRITION' and ABT_Subbrand = 'Pvt Lbl Rem Sbbr' then 'Pvt Lbl TN'						
+						when ABT_Segment = 'TODDLER NUTRITION' and ABT_Subbrand = 'PDS With Fiber' then 'PDS Fiber'
+						when ABT_Segment = 'TODDLER NUTRITION' and ABT_BRAND = 'Enfagrow' and ABT_Form = 'Liquid' then 'Enfagrow RTF'  --- CG changed abt_form to the proper case version
+						when AN_BRAND = 'Boost Kid Essentials' then 'BKE'
+						when ABT_BRAND = 'Boost Kid Essentials' then 'BKE' ---CG added also need abt_brand version
+						when ABT_BRAND = 'Drip Drop' then 'Drip Drop'
+						when ABT_BRAND = 'Hydralyte' then 'Hydralyte'
+						when ABT_BRAND = 'Earth''s Best' then 'Earth''s Best'
+						when ABT_BRAND = 'Suero' then 'Sueros'
+						when ABT_BRAND = 'Sueros' then 'Sueros' ---CG added
+						when ABT_BRAND = 'Orgain' then 'Orgain Kids'
+						when ABT_BRAND = 'Nutri Suero' then 'Sueros'
+						when ABT_BRAND = 'Pediasmart Powder' then 'All Other TN'
+						when ABT_BRAND = 'Happy Child' then 'All Other TN'
+						when ABT_BRAND = 'Bright Beginnings' then 'Pvt Lbl TN'
+						when ABT_BRAND = 'Pediasmart' then 'All Other TN'
+						when AN_BRAND = 'NTRC NEOCATE JR' then 'NTRC NEOCATE JR'
+						when AN_BRAND = 'E028 SPLASH' then 'All Other TN'
+						WHEN ABT_BRAND = 'NEOCATE' AND AN_BRAND <> 'NTRC NEOCATE JR' AND AN_BRAND <> 'E028 SPLASH' THEN 'Neocate Rem Sbbr'
+						when AN_BRAND = 'Pediasure Peptide' then 'All Other TN' --NEW
+						when AN_BRAND = 'BKE Institutional' then 'BKE'
+						when ABT_BRAND = 'Revitalyte' then 'All Other OES'
+						when ABT_Segment = 'ORAL ELECTROLYTES' AND TMC_MANUFACTURER = 'Private Label' THEN 'Pvt Lbl OES' ---CG added
+						when ABT_Segment = 'ORAL ELECTROLYTES' and TMC_MANUFACTURER = 'All Other' then 'All Other OES' ---CG added
+						when ABT_Segment = 'TODDLER NUTRITION' and TMC_MANUFACTURER = 'All Other' then 'All Other TN' ---CG added
+						else ABT_Subbrand
+						end as TMC_SUBBRAND_CUSTOM,
+				TMC_MANUFACTURER as TMC_MANUFACTURER,
+				TMC_FORMULA_SEGMENT as TMC_FORMULA_SEGMENT,
+				TMC_ABBOTT_PRODUCT as TMC_ABBOTT_PRODUCT,
+				ABT_Formula_Reb_NonReb as ABT_FORMULA_REB_NON_REBATED,
+				TMC_EQ_FACTOR as TMC_EQ_FACTOR,
+				TMC_INC_SHARE as TMC_INC_SHARE,
+				TMC_ITEM_DESC as TMC_ITEM_DESC,
+				ABT_Natural_Organic as ABT_NATURAL_ORGANIC,
+				ABT_Segment as ABT_SEGMENT
+
+		from mitest.T_Item_Master) A;
+
+--Keep any history not updated in this ETL
+INSERT INTO mitest.T_Consumption_Char_t
+SELECT	B.*
+
+FROM	mitest.T_Consumption_Char_t A 
+		RIGHT OUTER JOIN 
+		mida_data.Consumption_Char B 
+		ON A.UPC = B.UPC 
+		
+WHERE A.UPC IS NULL;
+
+
+DELETE mitest.T_Consumption_Char; --clear table
+
+INSERT INTO mitest.T_Consumption_Char 
+
+SELECT DISTINCT * FROM mitest.T_Consumption_Char_t;
+
+DROP TABLE IF EXISTS mitest.T_Consumption_Char_t;
+
+/**************************************************************************************************************************************
+
+--F.                                  Build T_Consumption_Nielsen_Char 
+
+**************************************************************************************************************************************/
+
+DELETE mitest.T_Consumption_Nielsen_Char; --clear table
+
+INSERT INTO mitest.T_Consumption_Nielsen_Char 
+SELECT 	 UPC_ASIN
+		,Item_Desc
+		,ABT_CATEGORY
+		,ABT_Segment
+		,ABT_Subsegment
+		,ABT_Formula_Reb_NonReb
+		,ABT_Formula_Ty
+		,ABT_Formula_SubTy
+		,ABT_Manufacturer
+		,ABT_BRAND_FAMILY
+		,ABT_BRAND
+		,ABT_Subbrand_Grp
+		,ABT_Subbrand
+		,ABT_Formula_Formulation
+		,ABT_Natural_Organic
+		,ABT_Variant
+		,ABT_Fiber_Tn
+		,ABT_FORM
+		,Form
+		,ABT_Pack
+		,ABT_Pack_Size
+		,ABT_Size_Range
+		,Package_General_Shape
+		,Nielsen_ABT_Size
+		,[ABT_Count Group (Form)]
+		,ABT_Count_Size
+		,Nielsen_ABT_Flavor_Group
+		,ABT_FLAVOR
+		,ABT_Multi
+		,inc_share
+		
+FROM mitest.T_Item_Master;
+
+--Keep history not updated in this ETL
+INSERT INTO mitest.T_Consumption_Nielsen_Char
+SELECT 	 B.[UPC]
+		,B.[ITEM]
+		,B.[ABT_CATEGORY]
+		,B.[ABT_SEGMENT]
+		,B.[ABT_SUBSEGMENT]
+		,B.[ABT_FORMULA REB/NON REBATED]
+		,B.[ABT_FORMULA TYPE]
+		,B.[ABT_FORMULA SUBTYPE]
+		,B.[ABT_MANUFACTURER]
+		,B.[ABT_BRAND FAMILY]
+		,B.[ABT_BRAND]
+		,B.[ABT_SUBBRAND GROUP]
+		,B.[ABT_SUBBRAND]
+		,B.[ABT_FORMULA FORMULATION]
+		,B.[ABT_NATURAL/ORGANIC]
+		,B.[ABT_VARIANT]
+		,B.[ABT_FIBER TN]
+		,B.[ABT_FORM TYPE]
+		,B.[ABT_FORM]
+		,B.[ABT_PACK]
+		,B.[ABT_PACK SIZE]
+		,B.[ABT_SIZE RANGE]
+		,B.[ABT_CONTAINER (LIQUID)]
+		,B.[ABT_SIZE (LIQUID)]
+		,B.[ABT_COUNT GROUP (FORM)]
+		,B.[ABT_COUNT SIZE]
+		,B.[ABT_FLAVOR GROUP]
+		,B.[ABT_FLAVOR]
+		,B.[ABT_MULTI]
+		,B.[inc_share]
+
+FROM	mitest.T_Consumption_Nielsen_Char A 
+		RIGHT OUTER JOIN 
+		mida_data.Consumption_Nielsen_Char B 
+		ON A.UPC = B.UPC 
+		
+WHERE 	A.UPC IS NULL;
+
+/**************************************************************************************************************************************
+
+--G.                                  Build T_Consumption_UPC_AN_ITEM 
+
+**************************************************************************************************************************************/
+
+DELETE mitest.T_Consumption_UPC_AN_ITEM; --clear table
+
+INSERT INTO mitest.T_Consumption_UPC_AN_ITEM (UPC,AN_ITEM_NBR)
+
+SELECT 	 DISTINCT UPC_ASIN as UPC
+		,AN_ITEM_NBR
+		
+FROM 	 mitest.RV_Item;
+
+
+
+/**************************************************************************************************************************************
+
+--I.                                            Update Item Attributes
+
+**************************************************************************************************************************************/
+
+--/*
+--I1.                                       Remove UPC that will be adjusted
+
+/*DELETE 	IM
+    
+FROM 	 mitest.T_Item_Master IM
+		,mitest.T_ItemOverrides IO
+
+WHERE 	IM.UPC_ASIN = IO.UPC;   */
+
+DELETE 	CC
+    
+FROM 	 mitest.T_Consumption_Char CC
+		,mitest.T_ItemOverrides IO
+
+WHERE 	CC.UPC = IO.UPC;
+
+--I2.                                             Load Adjustments
+
+INSERT INTO mitest.T_Consumption_Char
+SELECT 	 *
+FROM 	mitest.T_ItemOverrides;
+
+--*/
+
+/**************************************************************************************************************************************
+
+--J.                                      Create Five Groupings for TMC_Manufacturer
+
+**************************************************************************************************************************************/
+
+--Update T_Consumption_Char
+UPDATE mitest.T_Consumption_Char
+SET TMC_MANUFACTURER = 'Abbott', MANUFACTURER = 'Abbott'
+WHERE TMC_MANUFACTURER like '%ABBOTT%';
+
+UPDATE mitest.T_Consumption_Char
+SET TMC_MANUFACTURER = 'Reckitt', MANUFACTURER = 'Reckitt'
+WHERE TMC_MANUFACTURER like '%RECKITT%';
+
+UPDATE mitest.T_Consumption_Char
+SET TMC_MANUFACTURER = 'Private Label', MANUFACTURER = 'Private Label'
+WHERE TMC_MANUFACTURER like '%PRIVATE%';
+
+UPDATE mitest.T_Consumption_Char
+SET TMC_MANUFACTURER = 'Nestle', MANUFACTURER = 'Nestle'
+WHERE TMC_MANUFACTURER like '%NESTLE%';
+
+UPDATE mitest.T_Consumption_Char
+SET TMC_MANUFACTURER = 'All Other', MANUFACTURER = 'All Other'
+WHERE TMC_MANUFACTURER NOT LIKE '%ABBOTT%' 
+    AND TMC_MANUFACTURER NOT LIKE '%RECKITT%'
+    AND TMC_MANUFACTURER NOT LIKE '%PRIVATE%'
+    AND TMC_MANUFACTURER NOT LIKE '%NESTLE%';
+	
+UPDATE mitest.T_Consumption_Char
+SET TMC_MANUFACTURER = 'All Other', MANUFACTURER = 'All Other'
+WHERE TMC_MANUFACTURER NOT LIKE '%ABBOTT%' 
+    AND TMC_MANUFACTURER NOT LIKE '%RECKITT%'
+    AND TMC_MANUFACTURER NOT LIKE '%PRIVATE%'
+    AND TMC_MANUFACTURER NOT LIKE '%NESTLE%';	
+
+UPDATE mitest.T_Consumption_Char
+SET TMC_MANUFACTURER = 'All Other', MANUFACTURER = 'All Other'
+WHERE ITEM_DESC like '%Peptide%';
+
+UPDATE mitest.T_Consumption_Char
+SET AN_BRAND_FAMILY = 'Pediasure Peptide'
+WHERE ITEM_DESC like '%Peptide%';
+
+UPDATE mitest.T_Consumption_Char
+SET Subbrand = 'All Other TN'
+WHERE ITEM_DESC like '%Peptide%';
+
+UPDATE mitest.T_Consumption_Char
+SET TMC_SUBBRAND_CUSTOM = 'All Other TN'
+WHERE ITEM_DESC like '%Peptide%';
+
+UPDATE mitest.T_Consumption_Char
+SET ABBOTT_PRODUCT = 'All Other TN'
+WHERE ITEM_DESC like '%Peptide%';
+
+UPDATE mitest.T_Consumption_Char
+SET ABT_BRAND = 'Pediasure'
+WHERE ABT_BRAND = 'Pediasure Excl Peptide';
+
+UPDATE mitest.T_Consumption_Char
+SET AN_SEGMENT = case 	when AN_SEGMENT = 'INFANT FORMULA UA' OR NIELSEN_SEGMENT LIKE '%INFANT%' then 'IF'
+						when AN_SEGMENT = 'BALANCED NUTRITION' OR NIELSEN_SEGMENT LIKE '%BALANCED%' then 'BN'
+						when AN_SEGMENT = 'DIABETES NUTRITION' OR NIELSEN_SEGMENT LIKE '%DIABETE%' then 'DN'
+						when AN_SEGMENT = 'TODDLER NUTRITION' OR NIELSEN_SEGMENT LIKE '%TODDLER%' then 'KT'
+						when AN_SEGMENT = 'ORAL ELECTROLYTES' OR NIELSEN_SEGMENT LIKE '%ORAL ELECTROLYTE%' then 'KT'
+						when AN_SEGMENT = 'IFUA' then 'IF'
+						when AN_SEGMENT = 'OES' then 'KT'
+						ELSE AN_SEGMENT
+						END;
+
+UPDATE mitest.T_Consumption_Char
+SET ABT_MANUFACTURER = case when ABT_MANUFACTURER LIKE '%Abbott%' THEN 'Abbott Nutrition'
+							when ABT_MANUFACTURER LIKE '%Reckitt%' THEN 'Reckitt Benckiser'
+							when ABT_MANUFACTURER LIKE '%Nestle%' THEN 'Nestle'
+							when ABT_MANUFACTURER LIKE '%Private%' THEN 'Private Label'
+							when ABT_MANUFACTURER LIKE '%Unilever%' THEN 'Unilever'
+							else 'Rem Mfr'
+							end;
+							
+UPDATE mitest.T_Consumption_Char
+SET NIELSEN_ABT_MANUFACTURER = case when NIELSEN_ABT_MANUFACTURER LIKE '%Abbott%' THEN 'Abbott Nutrition'
+									when NIELSEN_ABT_MANUFACTURER LIKE '%Reckitt%' THEN 'Reckitt Benckiser'
+									when NIELSEN_ABT_MANUFACTURER LIKE '%Nestle%' THEN 'Nestle'
+									when NIELSEN_ABT_MANUFACTURER LIKE '%Private%' THEN 'Private Label'
+									when ABT_MANUFACTURER LIKE '%Unilever%' THEN 'Unilever'
+									else 'Rem Mfr'
+									end;
+
+UPDATE mitest.T_Consumption_Char
+SET AN_BRAND = 	case when AN_BRAND = 'Bgc High Protein' THEN 'BGC High Protein'
+					 when AN_BRAND = 'Bgc Regular' THEN 'BGC Regular'
+					 when AN_BRAND = 'Bke' THEN 'BKE'
+					 when AN_BRAND = 'Bke Institutional' THEN 'BKE Institutional'
+					 when AN_BRAND = 'Enf A.r.' THEN 'Enf A.R.'
+					 when AN_BRAND = 'Pdl Advanced Care' THEN 'PDL Advanced Care'
+					 when AN_BRAND = 'Pdl Advanced Care+' THEN 'PDL Advanced Care+'
+					 when AN_BRAND = 'Pdl Base' THEN 'PDL Base'
+					 when AN_BRAND = 'Pdl Immune Support' THEN 'PDL Immune Support'
+					 when AN_BRAND = 'Pdl Organic' THEN 'PDL Organic'
+					 when AN_BRAND = 'Pdl Sparkling Rush' THEN 'PDL Sparkling Rush'
+					 when AN_BRAND = 'Pdl Sport' THEN 'PDL Sport'
+					 when AN_BRAND = 'Pdl Zero Sugar' THEN 'PDL Zero Sugar'
+					 when AN_BRAND = 'Pds Base' THEN 'PDS Base'
+					 when AN_BRAND = 'Pds Peptide' THEN 'PDS Peptide'
+					 when AN_BRAND = 'Pds Pro' THEN 'PDS Pro'
+					 when AN_BRAND = 'Pds Sidekicks' THEN 'PDS Sidekicks'
+					 when AN_BRAND = 'Pds With Fiber' THEN 'PDS With Fiber'
+					 when AN_BRAND = 'Pedialyte Immune Support' THEN 'PDL Immune Support'
+					 when AN_BRAND = 'Pedialyte Sport' THEN 'PDL Sport'
+					 when AN_BRAND = 'Private Label Bn High Protein' THEN 'Private Label BN High Protein'
+					 when AN_BRAND = 'Private Label Bn Max Protein' THEN 'Private Label BN Max Protein'
+					 when AN_BRAND = 'Private Label Bn Original' THEN 'Private Label BN Original'
+					 when AN_BRAND = 'Private Label Bn Plus' THEN 'Private Label BN Plus'
+					 when AN_BRAND = 'Private Label Dn' THEN 'Private Label DN'
+					 when AN_BRAND = 'Pediasure Peptide (Abbott Nutrition)' THEN 'Pediasure Peptide'
+					 when AN_BRAND = 'Glucerna (Abbott Nutrition)' THEN 'Glucerna'
+					 when AN_BRAND = 'Enf Infant Gmo' THEN 'Enf Infant GMO'
+					 when AN_BRAND = 'Enfamil A2' THEN 'Enfamil A2'
+					 else AN_BRAND
+					end;
+
+UPDATE mitest.T_Consumption_Char
+SET AN_BRAND_FAMILY = 	case 	when AN_BRAND_FAMILY =  'Pediasure Excl Peptide' THEN 'Pediasure'
+								when AN_BRAND_FAMILY =  'Pediasure Peptide' THEN 'Pediasure Peptide'
+								when AN_BRAND_FAMILY =  'Glucerna (Abbott Nutrition)' THEN 'Glucerna'
+								when AN_BRAND_FAMILY =  'Pediasure (Abbott Nutrition)' THEN 'Pediasure'
+								ELSE AN_BRAND_FAMILY
+								end;
+
+UPDATE mitest.T_Consumption_Char
+SET NIELSEN_FORMULA_TYPE = 	case 	when NIELSEN_FORMULA_TYPE =  'Tolerance Ua' THEN 'Tolerance UA' 
+									when NIELSEN_FORMULA_TYPE =  'Prime Ua' THEN 'Prime UA' 
+									ELSE NIELSEN_FORMULA_TYPE 
+									end;
+
+UPDATE mitest.T_Consumption_Char
+SET NIELSEN_FORMULASUBTYPE = 	case 	when NIELSEN_FORMULASUBTYPE =  'Mild Milk Ua' THEN 'Mild Milk UA'
+										when NIELSEN_FORMULASUBTYPE =  'Soy Ua' THEN 'Soy UA' 
+										when NIELSEN_FORMULASUBTYPE =  'Prime Ua' THEN 'Prime UA' 
+										ELSE NIELSEN_FORMULASUBTYPE
+										end;
+
+UPDATE mitest.T_Consumption_Char
+SET [ABT_FORMULA TYPE] = case 	when [ABT_FORMULA TYPE] =  'Tolerance Ua' THEN 'Tolerance UA'  
+								when [ABT_FORMULA TYPE] =  'Prime Ua' THEN 'Prime UA' 
+								ELSE [ABT_FORMULA TYPE]
+								end;
+								
+UPDATE mitest.T_Consumption_Char
+SET [ABT_FORMULA SUBTYPE] = 	case 	when [ABT_FORMULA SUBTYPE] =  'Mild Milk Ua' THEN 'Mild Milk UA'
+										when [ABT_FORMULA SUBTYPE] =  'Soy Ua' THEN 'Soy UA' 
+										when [ABT_FORMULA SUBTYPE] =  'Prime Ua' THEN 'Prime UA' 
+										ELSE [ABT_FORMULA SUBTYPE]
+										end;
+
+UPDATE mitest.T_Consumption_Char
+SET NIELSEN_ABT_FORMULA_TYPE = case when NIELSEN_ABT_FORMULA_TYPE =  'Tolerance Ua' THEN 'Tolerance UA'  
+									when NIELSEN_ABT_FORMULA_TYPE =  'Prime Ua' THEN 'Prime UA' 
+									ELSE NIELSEN_ABT_FORMULA_TYPE
+									end;
+
+
+UPDATE mitest.T_Consumption_Nielsen_Char
+SET [ABT_FORMULA TYPE] = case 	when [ABT_FORMULA TYPE] =  'Tolerance Ua' THEN 'Tolerance UA'  
+								when [ABT_FORMULA TYPE] =  'Prime Ua' THEN 'Prime UA' 
+								ELSE [ABT_FORMULA TYPE]
+								end;
+								
+UPDATE mitest.T_Consumption_Nielsen_Char
+SET [ABT_FORMULA SUBTYPE] = 	case 	when [ABT_FORMULA SUBTYPE] =  'Mild Milk Ua' THEN 'Mild Milk UA'
+										when [ABT_FORMULA SUBTYPE] =  'Soy Ua' THEN 'Soy UA' 
+										when [ABT_FORMULA SUBTYPE] =  'Prime Ua' THEN 'Prime UA' 
+										ELSE [ABT_FORMULA SUBTYPE]
+										end;
+
+UPDATE mitest.T_Consumption_Nielsen_Char
+SET [ABT_SEGMENT] = 	case 	when [ABT_SEGMENT] =  'OES' THEN 'ORAL ELECTROLYTES'
+								when [ABT_SEGMENT] =  'IFUA' THEN 'INFANT FORMULA UA' 
+								when [ABT_SEGMENT] =  'TN' THEN 'TODDLER NUTRITION' 
+								ELSE [ABT_SEGMENT]
+								end;
+
+UPDATE mitest.T_Consumption_Nielsen_Char
+SET [ABT_SEGMENT] = 	case 	when [ABT_SEGMENT] =  'OES' THEN 'ORAL ELECTROLYTES'
+								when [ABT_SEGMENT] =  'IFUA' THEN 'INFANT FORMULA UA' 
+								when [ABT_SEGMENT] =  'TN' THEN 'TODDLER NUTRITION' 
+								ELSE [ABT_SEGMENT]
+								end;
+
+UPDATE mitest.T_Consumption_Char
+SET [ABT_FORMULA_REB_NON_REBATED] = case when [ABT_SEGMENT] <>  'INFANT FORMULA UA' THEN 'Non-Rebated'
+										 else [ABT_FORMULA_REB_NON_REBATED]
+										 end;
+
+UPDATE mitest.T_Consumption_Char
+SET [AN_WIC_REBATE_PRODUCT] = case 	when [ABT_SEGMENT] <>  'INFANT FORMULA UA' THEN 'Non-Rebated'
+									else [AN_WIC_REBATE_PRODUCT]
+									end;
+
+UPDATE mitest.T_Consumption_Char
+SET Subbrand = case when Subbrand = 'Pvt Lbl Oes' THEN 'Pvt Lbl OES'
+					when Subbrand = 'Bgc Regular' THEN 'BGC Regular'
+					when Subbrand = 'Bgc High Protein' THEN 'BGC High Protein'
+					when Subbrand = 'Bke' THEN 'BKE'
+					when Subbrand = 'Bke Institutional' THEN 'BKE Institutional'
+					when Subbrand = 'All Other Oes' THEN 'All Other OES'
+					when Subbrand = 'Pds Base Rtd' THEN 'PDS Base RTD'
+					when Subbrand = 'Pds Fiber' THEN 'PDS Fiber'
+					when Subbrand = 'Pds Sidekicks' THEN 'PDS Sidekicks'
+					when Subbrand = 'Pds Powder' THEN 'PDS Powder'
+					when Subbrand = 'Pds Organic' THEN 'PDS Organic'
+					when Subbrand = 'Pdl Organic' THEN 'PDL Organic'
+					when Subbrand = 'Pds Pro' THEN 'PDS Pro'
+					when Subbrand = 'Enf Infant Gmo' THEN 'Enf Infant GMO'
+					when Subbrand = 'Enfagrow Rtf' THEN 'Enfagrow RTF'
+					when Subbrand = 'Pvt Lbl Tn' THEN 'Pvt Lbl TN'
+					when Subbrand = 'Private Label Bn Plus' THEN 'Private Label BN Plus'
+					when Subbrand = 'Private Label Bn Original' THEN 'Private Label BN Original'
+					when Subbrand = 'Private Label Bn High Protein' THEN 'Private Label BN High Protein'
+					when Subbrand = 'Private Label Dn' THEN 'Private Label DN'
+					when Subbrand = 'Private Label Bn Max Protein' THEN 'Private Label BN Max Protein'
+					when Subbrand = 'Bke Institutional' THEN 'BKE Institutional'
+					when Subbrand = 'Pdl Base' THEN 'PDL Base'
+					when Subbrand = 'Pds Base Original' THEN 'PDS Base Original'
+					when Subbrand = 'Pdl Advanced Care+' THEN 'PDL Advanced Care+'
+					when Subbrand = 'Pds With Fiber' THEN 'PDS With Fiber'
+					when Subbrand = 'Pds Peptide' THEN 'PDS Peptide'
+					when Subbrand = 'Pdl Advanced Care' THEN 'PDL Advanced Care'
+					when Subbrand = 'Pds Base Organic' THEN 'PDS Base Organic'
+					when Subbrand = 'Pdl Sparkling Rush' THEN 'PDL Sparkling Rush'
+					when Subbrand = 'Pdl Sport' THEN 'PDL Sport'
+					when Subbrand = 'Pdl Zero Sugar' THEN 'PDL Zero Sugar'
+					when Subbrand = 'Pdl Immune Support' THEN 'PDL Immune Support'
+					else Subbrand
+					end;
+					
+UPDATE mitest.T_Consumption_Char
+SET ABT_SUBBRAND = case when ABT_SUBBRAND = 'Pvt Lbl Oes' THEN 'Pvt Lbl OES'
+						when ABT_SUBBRAND = 'Bgc Regular' THEN 'BGC Regular'
+						when ABT_SUBBRAND = 'Bgc High Protein' THEN 'BGC High Protein'
+						when ABT_SUBBRAND = 'Bke' THEN 'BKE'
+						when ABT_SUBBRAND = 'Bke Institutional' THEN 'BKE Institutional'
+						when ABT_SUBBRAND = 'All Other Oes' THEN 'All Other OES'
+						when ABT_SUBBRAND = 'Pds Base Rtd' THEN 'PDS Base RTD'
+						when ABT_SUBBRAND = 'Pds Fiber' THEN 'PDS Fiber'
+						when ABT_SUBBRAND = 'Pds Sidekicks' THEN 'PDS Sidekicks'
+						when ABT_SUBBRAND = 'Pds Powder' THEN 'PDS Powder'
+						when ABT_SUBBRAND = 'Pds Organic' THEN 'PDS Organic'
+						when ABT_SUBBRAND = 'Pdl Organic' THEN 'PDL Organic'
+						when ABT_SUBBRAND = 'Pds Pro' THEN 'PDS Pro'
+						when ABT_SUBBRAND = 'Enf Infant Gmo' THEN 'Enf Infant GMO'
+						when ABT_SUBBRAND = 'Enfagrow Rtf' THEN 'Enfagrow RTF'
+						when ABT_SUBBRAND = 'Pvt Lbl Tn' THEN 'Pvt Lbl TN'
+						when ABT_SUBBRAND = 'Private Label Bn Plus' THEN 'Private Label BN Plus'
+						when ABT_SUBBRAND = 'Private Label Bn Original' THEN 'Private Label BN Original'
+						when ABT_SUBBRAND = 'Private Label Bn High Protein' THEN 'Private Label BN High Protein'
+						when ABT_SUBBRAND = 'Private Label Dn' THEN 'Private Label DN'
+						when ABT_SUBBRAND = 'Private Label Bn Max Protein' THEN 'Private Label BN Max Protein'
+						when ABT_SUBBRAND = 'Bke Institutional' THEN 'BKE Institutional'
+						when ABT_SUBBRAND = 'Pdl Base' THEN 'PDL Base'
+						when ABT_SUBBRAND = 'Pds Base Original' THEN 'PDS Base Original'
+						when ABT_SUBBRAND = 'Pdl Advanced Care+' THEN 'PDL Advanced Care+'
+						when ABT_SUBBRAND = 'Pds With Fiber' THEN 'PDS With Fiber'
+						when ABT_SUBBRAND = 'Pds Peptide' THEN 'PDS Peptide'
+						when ABT_SUBBRAND = 'Pdl Advanced Care' THEN 'PDL Advanced Care'
+						when ABT_SUBBRAND = 'Pds Base Organic' THEN 'PDS Base Organic'
+						when ABT_SUBBRAND = 'Pdl Sparkling Rush' THEN 'PDL Sparkling Rush'
+						when ABT_SUBBRAND = 'Pdl Sport' THEN 'PDL Sport'
+						when ABT_SUBBRAND = 'Pdl Zero Sugar' THEN 'PDL Zero Sugar'
+						when ABT_SUBBRAND = 'Pdl Immune Support' THEN 'PDL Immune Support'
+						else ABT_SUBBRAND
+						end;
+
+UPDATE mitest.T_Consumption_Char
+SET TMC_SUBBRAND_CUSTOM = case when TMC_SUBBRAND_CUSTOM = 'Pvt Lbl Oes' THEN 'Pvt Lbl OES'
+						when TMC_SUBBRAND_CUSTOM = 'Bgc Regular' THEN 'BGC Regular'
+						when TMC_SUBBRAND_CUSTOM = 'Bgc High Protein' THEN 'BGC High Protein'
+						when TMC_SUBBRAND_CUSTOM = 'Bke' THEN 'BKE'
+						when TMC_SUBBRAND_CUSTOM = 'Bke Institutional' THEN 'BKE Institutional'
+						when TMC_SUBBRAND_CUSTOM = 'All Other Oes' THEN 'All Other OES'
+						when TMC_SUBBRAND_CUSTOM = 'Pds Base Rtd' THEN 'PDS Base RTD'
+						when TMC_SUBBRAND_CUSTOM = 'Pds Fiber' THEN 'PDS Fiber'
+						when TMC_SUBBRAND_CUSTOM = 'Pds Sidekicks' THEN 'PDS Sidekicks'
+						when TMC_SUBBRAND_CUSTOM = 'Pds Powder' THEN 'PDS Powder'
+						when TMC_SUBBRAND_CUSTOM = 'Pds Organic' THEN 'PDS Organic'
+						when TMC_SUBBRAND_CUSTOM = 'Pdl Organic' THEN 'PDL Organic'
+						when TMC_SUBBRAND_CUSTOM = 'Pds Pro' THEN 'PDS Pro'
+						when TMC_SUBBRAND_CUSTOM = 'Enf Infant Gmo' THEN 'Enf Infant GMO'
+						when TMC_SUBBRAND_CUSTOM = 'Enfagrow Rtf' THEN 'Enfagrow RTF'
+						when TMC_SUBBRAND_CUSTOM = 'Pvt Lbl Tn' THEN 'Pvt Lbl TN'
+						when TMC_SUBBRAND_CUSTOM = 'Private Label Bn Plus' THEN 'Private Label BN Plus'
+						when TMC_SUBBRAND_CUSTOM = 'Private Label Bn Original' THEN 'Private Label BN Original'
+						when TMC_SUBBRAND_CUSTOM = 'Private Label Bn High Protein' THEN 'Private Label BN High Protein'
+						when TMC_SUBBRAND_CUSTOM = 'Private Label Dn' THEN 'Private Label DN'
+						when TMC_SUBBRAND_CUSTOM = 'Private Label Bn Max Protein' THEN 'Private Label BN Max Protein'
+						when TMC_SUBBRAND_CUSTOM = 'Bke Institutional' THEN 'BKE Institutional'
+						when TMC_SUBBRAND_CUSTOM = 'Pdl Base' THEN 'PDL Base'
+						when TMC_SUBBRAND_CUSTOM = 'Pds Base Original' THEN 'PDS Base Original'
+						when TMC_SUBBRAND_CUSTOM = 'Pdl Advanced Care+' THEN 'PDL Advanced Care+'
+						when TMC_SUBBRAND_CUSTOM = 'Pds With Fiber' THEN 'PDS With Fiber'
+						when TMC_SUBBRAND_CUSTOM = 'Pds Peptide' THEN 'PDS Peptide'
+						when TMC_SUBBRAND_CUSTOM = 'Pdl Advanced Care' THEN 'PDL Advanced Care'
+						when TMC_SUBBRAND_CUSTOM = 'Pds Base Organic' THEN 'PDS Base Organic'
+						when TMC_SUBBRAND_CUSTOM = 'Pdl Sparkling Rush' THEN 'PDL Sparkling Rush'
+						when TMC_SUBBRAND_CUSTOM = 'Pdl Sport' THEN 'PDL Sport'
+						when TMC_SUBBRAND_CUSTOM = 'Pdl Zero Sugar' THEN 'PDL Zero Sugar'
+						when TMC_SUBBRAND_CUSTOM = 'Pdl Immune Support' THEN 'PDL Immune Support'
+						else TMC_SUBBRAND_CUSTOM
+						end;
+
+UPDATE mitest.T_Consumption_Char
+SET [NIELSEN_ABT_REBATE] = case when [ABT_SEGMENT] <>  'INFANT FORMULA UA' THEN 'Non-Rebated'
+										 else [NIELSEN_ABT_REBATE]
+										 end;
+
+UPDATE mitest.T_Consumption_Nielsen_Char
+SET [ABT_FORMULA REB/NON REBATED] = case when [ABT_SEGMENT] <>  'INFANT FORMULA UA' THEN 'Non-Rebated'
+										 else [ABT_FORMULA REB/NON REBATED]
+										 end;
+		
+
+
+/**************************************************************************************************************************************
+
+--K.                                      Delete items that don't have sales facts
+
+**************************************************************************************************************************************/
+
+DELETE a
+from mitest.T_Consumption_Char a 
+	left outer join
+	mitest.t_consumption b
+on a.upc = b.upc
+where b.upc is null;
+
+
+DELETE a
+from mitest.T_Consumption_Nielsen_Char a 
+	left outer join
+	mitest.t_consumption b
+on a.upc = b.upc
+where b.upc is null;
+
+
+/**************************************************************************************************************************************
+
+--                                               END
+
+**************************************************************************************************************************************/
+

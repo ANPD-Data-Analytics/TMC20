@@ -1,0 +1,49 @@
+
+
+/**************************************************************************************************************************************/
+
+--                                                          PUBLISH TO PRODUCTION - mida_data
+--Run this after we've validated that everything is ready to publish to the "production" tables!
+/**************************************************************************************************************************************/
+
+
+
+DROP TABLE IF EXISTS mida_data.Consumption;
+DROP TABLE IF EXISTS mida_data.Consumption_Char;
+DROP TABLE IF EXISTS mida_data.Consumption_Nielsen_Char;
+DROP TABLE IF EXISTS mida_data.Consumption_UPC_AN_ITEM;
+DROP TABLE IF EXISTS mida_data.Consumption_UPC_ASIN;
+
+delete from mida_data.Archive_Consumption where PublishedDate <= DATEADD(month, -2, GETDATE());
+delete from mida_data.Archive_Consumption_Char where PublishedDate <= DATEADD(month, -2, GETDATE());
+
+insert into mida_data.Archive_Consumption
+select a.*, CURRENT_TIMESTAMP as PublishedDate
+from mitest.T_Consumption a;
+
+insert into mida_data.Archive_Consumption_Char
+select a.*, CURRENT_TIMESTAMP as PublishedDate
+from mitest.T_Consumption_Char a;
+
+
+select *
+into mida_data.Consumption
+from mitest.T_Consumption;
+
+select *
+into mida_data.Consumption_Char
+from mitest.T_Consumption_Char;
+
+select *
+into mida_data.Consumption_Nielsen_Char
+from mitest.T_Consumption_Nielsen_Char;
+
+select *
+into mida_data.Consumption_UPC_AN_ITEM
+from mitest.T_Consumption_UPC_AN_ITEM;
+
+select *
+into mida_data.Consumption_UPC_ASIN
+from mitest.T_Consumption_UPC_ASIN;
+
+

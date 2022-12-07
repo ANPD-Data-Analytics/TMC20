@@ -1,0 +1,161 @@
+
+DROP TABLE IF EXISTS mitest.TMC_Stage_Data_Validation;
+
+  select a.ABT_Segment
+		,a.Period_Desc as Nielsen_week_end_date
+		,a.ABT_Manufacturer
+		,'T_Niel_Extract_Total_LN' as Table_Loaded
+		,count(*) as record_count
+
+into mitest.TMC_Stage_Data_Validation
+
+  from mitest.T_Niel_Extract_Total_LN a
+
+  group by a.ABT_Segment
+		,a.Period_Desc
+		,a.ABT_Manufacturer
+		
+union
+
+  select a.ABT_Segment
+		,a.Period_Desc as Nielsen_week_end_date
+		,a.ABT_Manufacturer
+		,'T_Niel_Extract_Total_ITN' as Table_Loaded
+		,count(*) as record_count
+
+  from mitest.T_Niel_Extract_Total_ITN a
+
+  group by a.ABT_Segment
+		,a.Period_Desc
+		,a.ABT_Manufacturer
+
+union
+
+  select a.ABT_Segment
+		,a.Period_Desc as Nielsen_week_end_date
+		,a.ABT_Manufacturer
+		,'T_Niel_Extract_UPC_LN' as Table_Loaded
+		,count(*) as record_count
+
+  from mitest.T_Niel_Extract_UPC_LN a
+
+  group by a.ABT_Segment
+		,a.Period_Desc
+		,a.ABT_Manufacturer
+		
+union
+
+  select a.ABT_Segment
+		,a.Period_Desc as Nielsen_week_end_date
+		,a.ABT_Manufacturer
+		,'T_Niel_Extract_UPC_ITN' as Table_Loaded
+		,count(*) as record_count
+
+  from mitest.T_Niel_Extract_UPC_ITN a
+
+  group by a.ABT_Segment
+		,a.Period_Desc
+		,a.ABT_Manufacturer		
+		
+union
+
+  select a.ABT_Segment
+		,NULL as Nielsen_week_end_date
+		,a.ABT_Manufacturer
+		,'T_Niel_Extract_Item_ITN' as Table_Loaded
+		,count(*) as record_count
+
+  from mitest.T_Niel_Extract_Item_ITN a
+
+  group by a.ABT_Segment
+		,a.ABT_Manufacturer		
+
+union
+
+  select a.ABT_Segment
+		,NULL as Nielsen_week_end_date
+		,a.ABT_Manufacturer
+		,'T_Niel_Extract_Item_LN' as Table_Loaded
+		,count(*) as record_count
+
+  from mitest.T_Niel_Extract_Item_LN a
+
+  group by a.ABT_Segment
+		,a.ABT_Manufacturer
+
+union
+
+  select 'UnknownAtLoad' as ABT_Segment
+		,a.Period_Desc as Nielsen_week_end_date
+		,'UnknownAtLoad' as ABT_Manufacturer
+		,'T_Amazon' as Table_Loaded
+		,count(*) as record_count
+
+  from mitest.T_Amazon a
+
+  group by a.Period_Desc
+
+union
+
+  select a.RV_Segment as ABT_Segment
+		,a.Period_Desc as Nielsen_week_end_date
+		,a.Nielsen_Manufacturer as ABT_Manufacturer
+		,'T_Kroger' as Table_Loaded
+		,count(*) as record_count
+
+  from mitest.T_Kroger a
+
+  group by	 a.RV_Segment
+			,a.Period_Desc 
+			,a.Nielsen_Manufacturer
+			
+union
+
+  select A.NIELSEN_SEGMENT AS ABT_Segment
+		,NULL as Nielsen_week_end_date
+		,a.NIELSEN_ABT_Manufacturer AS ABT_Manufacturer
+		,'RV_Item' as Table_Loaded
+		,count(*) as record_count
+
+  from mitest.RV_Item a
+
+  group by A.NIELSEN_SEGMENT
+		,a.NIELSEN_ABT_Manufacturer
+		
+union
+
+  select 'UnknownAtLoad' AS ABT_Segment
+		,a.[Period Description] as Nielsen_week_end_date
+		,'UnknownAtLoad' AS ABT_Manufacturer
+		,'T_Overrides_and_Plugs' as Table_Loaded
+		,count(*) as record_count
+
+  from mitest.T_Overrides_and_Plugs a
+
+  group by a.[Period Description]
+		
+union
+
+  select a.NIELSEN_SEGMENT AS ABT_Segment
+		,NULL as Nielsen_week_end_date
+		,a.Nielsen_Manufacturer AS ABT_Manufacturer
+		,'T_ItemOverrides' as Table_Loaded
+		,count(*) as record_count
+
+  from mitest.T_ItemOverrides a
+
+  group by A.NIELSEN_SEGMENT
+		,a.NIELSEN_Manufacturer
+		
+union
+
+  select 'UnknownAtLoad' AS ABT_Segment
+		,NULL as Nielsen_week_end_date
+		,'UnknownAtLoad' AS ABT_Manufacturer
+		,'T_Consumption_UPC_ASIN' as Table_Loaded
+		,count(*) as record_count
+
+  from mitest.T_Consumption_UPC_ASIN a
+
+
+		;

@@ -1,0 +1,1089 @@
+/**************CAUTION************Execute Only after data has been staged (step 1)*************************************
+
+1. All Data Ingestion for the Following BOA Tables:
+    
+    -T_Amazon
+    -T_Kroger
+    -T_Niel_Extract_Total_ITN
+    -T_Niel_Extract_Total_LN
+    -T_Niel_Extract_UPC_ITN
+    -T_Niel_Extract_UPC_LN
+    -T_Niel_Extract_Item_ITN
+    -T_Niel_Extract_Item_LN
+    -RV_Item
+    -T_Overrides_and_Plugs --when required    
+
+**************************************************************************************************************************************
+
+--                              Deletes all Records Related to the Periods that are being Refreshed                    
+
+**************************************************************************************************************************************/
+
+DELETE FROM mitest.T_Consumption 
+WHERE T_Consumption.[Period Description] >= (select min(Period_Desc) as Begin_Refresh_Dt from mitest.T_Niel_Extract_UPC_LN); 
+        
+
+With  --ETA: up to 60 secs
+
+/**************************************************************************************************************************************/
+
+--A.                                             Build Nielsen UPC Facts
+
+/**************************************************************************************************************************************/
+
+UPC_Sales_LN  --LN weekly sales dollars @ UPC
+as 
+(select UPC, Period_Desc, Market_Desc
+    , case when Dollars is null or Dollars = '' then 0 else convert(decimal(15,2), Dollars) end as UPC_Sales
+    , case when Units is null or Units = '' then 0 else convert(decimal(15,2), Units) end as UPC_Units
+    , case when EQ is null or EQ = '' then 0 else convert(decimal(15,2), EQ) end as UPC_EQ
+from mitest.T_Niel_Extract_UPC_LN
+where ABT_FORM <> 'PUDDING' --Nielsen to remove from extracts soon.  This is referenced 4x in this script.
+)
+, 
+
+UPC_Sales_ITN --ITN weekly sales dollars @ UPC 
+as 
+(select UPC, Period_Desc, Market_Desc
+    , case when Dollars is null or Dollars = '' then 0 else convert(decimal(15,2), Dollars) end as UPC_Sales
+    , case when Units is null or Units = '' then 0 else convert(decimal(15,2), Units) end as UPC_Units
+    , case when EQ is null or EQ = '' then 0 else convert(decimal(15,2), EQ) end as UPC_EQ 
+from mitest.T_Niel_Extract_UPC_ITN
+)
+
+/**************************************************************************************************************************************/
+
+--B.                                      Calculate Suppressed UPCs aka Generics
+
+/**************************************************************************************************************************************/
+,
+LN_TOTAL
+as
+(select t.DB, t.Market_Desc, t.ABT_Segment, t.ABT_Subsegment, t.ABT_Manufacturer, t.ABT_Brand
+	, t.ABT_Subbrand, t.ABT_Form, t.ABT_Flavor, t.ABT_Count_Size,  t.Period_Desc
+	, convert(decimal(15,2), t2.Dollars) as Total_Sales
+    , convert(decimal(15,2), t2.Units) as Total_Units
+    , convert(decimal(15,2), t2.EQ) as Total_EQ
+
+from mitest.T_Niel_Extract_Total_LN t
+    join mitest.T_Niel_Extract_Total_LN t2
+        on t2.ABT_Segment = t.ABT_Segment
+        and t2.ABT_Subsegment = t.ABT_Subsegment
+        and t2.ABT_Manufacturer = t.ABT_Manufacturer
+        and t2.ABT_Brand = t.ABT_Brand
+        and t2.ABT_Subbrand = t.ABT_Subbrand
+        and t2.ABT_Form = t.ABT_Form
+        and t2.ABT_Flavor = t.ABT_Flavor
+        and t2.ABT_Count_Size = t.ABT_Count_Size
+        and t2.Period_Desc = t.Period_Desc
+        and t2.DB = t.DB
+		and t.Dollars = t2.Dollars
+where (--Assumption: Nielsen only suppresses UPCs for these retailers
+            (t.Market_Desc IN ('CVS Total Corp WO HI TA', 'Wags/Rite Aid Corp Total TA', 'Rite Aid - Corp Total TA')
+                AND t2.Market_Desc = 'Total US Drug'
+            )
+                OR
+            (t.Market_Desc IN ('ALBSCO Total Company TA', 'Ahold USA Corp Total TA','Meijer Total TA', 'Publix Total TA') 
+                AND t2.Market_Desc = 'Total US Food'
+            )
+                OR 
+            (t.Market_Desc = 'Sam''s Total TA'
+                AND t2.Market_Desc = 'Total US xAOC'
+            )
+        )
+)
+, 
+
+LN_Generics
+as
+(select distinct 
+'GN'+ REVERSE(SUBSTRING(t0.UPC,3,10)) as GenericUPC, t.Market_Desc, t.ABT_Segment
+	, t.ABT_Subsegment, t.ABT_Manufacturer, t.ABT_Brand, t.ABT_Subbrand, t.ABT_Form, t.ABT_Flavor
+	, t.ABT_Count_Size,  t.Period_Desc
+	, t.Total_Sales -u2.UPC_Sales as Generic_Sales
+    , t.Total_Units -u2.UPC_Units as Generic_Units
+    , t.Total_EQ -u2.UPC_EQ as Generic_EQ
+from LN_Total t
+    join mitest.T_Niel_Extract_UPC_LN t0 
+on	t0.Market_Desc = t.Market_Desc
+		and t0.ABT_Segment = t.ABT_Segment
+		and t0.ABT_Subsegment = t.ABT_Subsegment
+		and t0.ABT_Manufacturer = t.ABT_Manufacturer
+		and t0.ABT_Brand = t.ABT_Brand
+		and t0.ABT_Subbrand = t.ABT_Subbrand
+		and t0.ABT_Form = t.ABT_Form
+		and t0.ABT_Flavor = t.ABT_Flavor
+		and t0.ABT_Count_Size = t.ABT_Count_Size
+		and t0.ABT_Subsegment = t.ABT_Subsegment
+		and t0.Period_Desc = t.Period_Desc
+        and (convert(decimal(15,2), t0.Dollars) = 0 or t0.Dollars is NULL)--Suppressed UPCs
+        and t0.Market_Desc not in ('Total US Drug', 'Total US Food', 'Total US xAOC')
+    join 
+        (select max(u.UPC) as UPC --pick one UPC to create GenericUPC
+				, u.Market_Desc 
+				, u.ABT_Segment
+				, u.ABT_Subsegment 
+				, u.ABT_Manufacturer 
+				, u.ABT_Brand
+				, u.ABT_Subbrand 
+				, u.ABT_Form 
+				, u.ABT_Flavor 
+				, u.ABT_Count_Size 
+				, u.Period_Desc 
+				, sum(case when u.Dollars is null or u.Dollars = '' then 0 else convert(decimal(15,2), u.Dollars) end) as UPC_Sales
+				, sum(case when u.Units is null or u.Units = '' then 0 else convert(decimal(15,2), u.Units) end) as UPC_Units
+				, sum(case when u.EQ is null or u.EQ = '' then 0 else convert(decimal(15,2), u.EQ) end) as UPC_EQ  
+				from mitest.T_Niel_Extract_UPC_LN u
+				where u.Market_Desc not in ('Total US Drug', 'Total US Food', 'Total US xAOC')
+				group by u.Market_Desc 
+						, u.ABT_Segment
+						, u.ABT_Subsegment 
+						, u.ABT_Manufacturer 
+						, u.ABT_Brand
+						, u.ABT_Subbrand 
+						, u.ABT_Form 
+						, u.ABT_Flavor 
+						, u.ABT_Count_Size 
+						, u.ABT_Subsegment
+						, u.Period_Desc ) as u2
+						
+			on u2.Market_Desc = t.Market_Desc
+            and u2.ABT_Segment = t.ABT_Segment
+            and u2.ABT_Subsegment = t.ABT_Subsegment
+            and u2.ABT_Manufacturer = t.ABT_Manufacturer
+            and u2.ABT_Brand = t.ABT_Brand
+            and u2.ABT_Subbrand = t.ABT_Subbrand
+            and u2.ABT_Form = t.ABT_Form
+            and u2.ABT_Flavor = t.ABT_Flavor
+            and u2.ABT_Count_Size = t.ABT_Count_Size
+            and u2.ABT_Subsegment = t.ABT_Subsegment
+            and u2.Period_Desc = t.Period_Desc
+)
+
+
+/******************************** 2 steps process to calculate ITN Generics ***************************************/
+                                            --Step 1. Get Total $ Sales
+,
+ITN_Total
+as
+(select t.DB, t.Market_Desc, t.ABT_Segment, t.ABT_Subsegment, t.ABT_Manufacturer
+    , t.ABT_Brand, t.ABT_Subbrand, t.ABT_Form, t.ABT_Flavor, t.ABT_Count_Size, t.ABT_Pack_Size
+    , t.Period_Desc, t.ABT_Size_Range
+    , t.ABT_Formula_Reb_NonReb, t.ABT_Formula_Subty, t.ABT_Formula_Ty 
+    , convert(decimal(15,2), t2.Dollars) as Total_Sales
+    , convert(decimal(15,2), t2.Units) as Total_Units
+    , convert(decimal(15,2), t2.EQ) as Total_EQ
+from mitest.T_Niel_Extract_Total_ITN t
+    join mitest.T_Niel_Extract_Total_ITN t2 --to add missing Sales $ in UPC file
+        on t.ABT_Segment = t2.ABT_Segment
+        and t.ABT_Subsegment = t2.ABT_Subsegment
+        and t.ABT_Manufacturer = t2.ABT_Manufacturer
+        and t.ABT_Brand = t2.ABT_Brand
+        and t.ABT_Subbrand = t2.ABT_Subbrand
+        and t.ABT_Form = t2.ABT_Form
+        and t.ABT_Flavor = t2.ABT_Flavor
+        and t.ABT_Count_Size = t2.ABT_Count_Size
+        and t.ABT_Size_Range = t2.ABT_Size_Range
+        and t.ABT_Pack_Size = t2.ABT_Pack_Size
+        and t.Period_Desc = t2.Period_Desc
+        and t.DB = t2.DB
+        and t.ABT_Formula_Reb_NonReb = t2.ABT_Formula_Reb_NonReb
+        and t.ABT_Formula_Subty = t2.ABT_Formula_Subty
+        and t.ABT_Formula_Ty = t2.ABT_Formula_Ty
+        and t.Dollars = t2.Dollars
+where (--Assumption: Nielsen only suppresses UPCs for these retailers
+            (t.Market_Desc IN ('CVS Total Corp WO HI TA', 'Wags/Rite Aid Corp Total TA', 'Rite Aid - Corp Total TA')
+                AND t2.Market_Desc = 'Total US Drug'
+            )
+                OR
+            (t.Market_Desc IN ('ALBSCO Total Company TA', 'Ahold USA Corp Total TA','Meijer Total TA', 'Publix Total TA') 
+                AND t2.Market_Desc = 'Total US Food'
+            )
+                OR 
+            (t.Market_Desc = 'Sam''s Total TA'
+                AND t2.Market_Desc = 'Total US xAOC'
+            )
+        )
+)
+, 
+
+                                    --Step 2. Now, Subtract UPC Sales from Total to Get Generic Sales
+ITN_Generics
+as
+(select distinct
+'GN'+ REVERSE(SUBSTRING(u2.UPC,3,10)) as GenericUPC --masking
+    , t.Market_Desc, t.ABT_Segment
+    , t.ABT_Subsegment, t.ABT_Manufacturer, t.ABT_Brand, t.ABT_Subbrand, t.ABT_Form
+    , t.ABT_Flavor, t.ABT_Count_Size, t.ABT_Pack_Size, t.Period_Desc, t.ABT_Size_Range
+    , t.ABT_Formula_Reb_NonReb, t.ABT_Formula_Subty, t.ABT_Formula_Ty
+    , t.Total_Sales -u2.UPC_Sales as Generic_Sales
+    , t.Total_Units -u2.UPC_Units as Generic_Units
+    , t.Total_EQ -u2.UPC_EQ as Generic_EQ
+from ITN_Total t
+    join mitest.T_Niel_Extract_UPC_ITN t0 --To filter to Suppressed Only then find UPC Sales in next join
+    on t.ABT_Segment = t0.ABT_Segment
+        and t.ABT_Subsegment = t0.ABT_Subsegment
+        and t.ABT_Manufacturer = t0.ABT_Manufacturer
+        and t.ABT_Brand = t0.ABT_Brand
+        and t.ABT_Subbrand = t0.ABT_Subbrand
+        and t.ABT_Form = t0.ABT_Form
+        and t.ABT_Flavor = t0.ABT_Flavor
+        and t.ABT_Count_Size = t0.ABT_Count_Size
+        and t.ABT_Size_Range = t0.ABT_Size_Range
+        and t.ABT_Pack_Size = t0.ABT_Pack_Size
+        and t.Period_Desc = t0.Period_Desc
+        and t.ABT_Formula_Reb_NonReb = t0.ABT_Formula_Reb_NonReb
+        and t.ABT_Formula_Subty = t0.ABT_Formula_Subty
+        and t.ABT_Formula_Ty = t0.ABT_Formula_Ty
+        and convert(decimal(15,2), t0.Dollars) = 0 --Suppressed UPCs
+        and t0.Market_Desc not in ('Total US Drug', 'Total US Food', 'Total US xAOC')
+    join 
+        (select max(u.UPC) as UPC --pick one UPC to create GenericUPC
+        , u.Market_Desc 
+        , u.ABT_Segment
+        , u.ABT_Subsegment 
+        , u.ABT_Manufacturer 
+        , u.ABT_Brand
+        , u.ABT_Subbrand 
+        , u.ABT_Form 
+        , u.ABT_Flavor 
+        , u.ABT_Count_Size 
+        , u.ABT_Pack_Size
+        , u.Period_Desc 
+        , u.ABT_Formula_Reb_NonReb 
+        , u.ABT_Formula_Subty 
+        , u.ABT_Formula_Ty
+        , u.ABT_Size_Range
+        , sum(case when u.Dollars is null or u.Dollars = '' then 0 else convert(decimal(15,2), u.Dollars) end) as UPC_Sales
+        , sum(case when u.Units is null or u.Units = '' then 0 else convert(decimal(15,2), u.Units) end) as UPC_Units
+        , sum(case when u.EQ is null or u.EQ = '' then 0 else convert(decimal(15,2), u.EQ) end) as UPC_EQ  
+        from mitest.T_Niel_Extract_UPC_ITN u
+        where u.Market_Desc not in ('Total US Drug', 'Total US Food', 'Total US xAOC')
+        group by u.Market_Desc, u.ABT_Segment, u.ABT_Subsegment, u.ABT_Manufacturer, u.ABT_Brand, u.ABT_Subbrand, u.ABT_Form, u.ABT_Flavor, u.ABT_Count_Size, u.Period_Desc, u.ABT_Formula_Reb_NonReb, u.ABT_Formula_Subty, u.ABT_Formula_Ty, u.ABT_Pack_Size, u.ABT_Size_Range        
+        ) as u2
+            on u2.Market_Desc = t.Market_Desc
+            and u2.ABT_Segment = t.ABT_Segment
+            and u2.ABT_Subsegment = t.ABT_Subsegment
+            and u2.ABT_Manufacturer = t.ABT_Manufacturer
+            and u2.ABT_Brand = t.ABT_Brand
+            and u2.ABT_Subbrand = t.ABT_Subbrand
+            and u2.ABT_Form = t.ABT_Form
+            and u2.ABT_Flavor = t.ABT_Flavor
+            and u2.ABT_Count_Size = t.ABT_Count_Size
+            and u2.ABT_Pack_Size = t.ABT_Pack_Size
+            and u2.ABT_Size_Range = t.ABT_Size_Range
+            and u2.Period_Desc = t.Period_Desc
+            and u2.ABT_Formula_Reb_NonReb = t.ABT_Formula_Reb_NonReb
+            and u2.ABT_Formula_Subty = t.ABT_Formula_Subty
+            and u2.ABT_Formula_Ty = t.ABT_Formula_Ty
+)
+
+/**************************************************************************************************************************************/
+
+--C.                                             Calculate Kroger
+
+/**************************************************************************************************************************************/
+
+,
+Kroger
+as 
+(select Market_Desc 
+    ,Period_Desc 
+    ,UPC 
+    ,Dollars
+    ,Units
+    ,EQ
+from mitest.T_Kroger 
+where --#### 20220301: CG: ADDING IN LOGIC TO REMOVE NEGATIVES IF THEY APPEAR IN DOLLARS UNITS OR EQ FROM WEEK END 2022-02-19 FORWARD   #####    
+    Dollars > 0
+    and Units > 0
+    and EQ > 0
+    and item not like '%PediaSure Harvest%' --exclude
+    and Nielsen_Manufacturer not like 'PRIVATE%' --exclude because unable to match upc to Nielsen, this will remain in AO Food Final
+    and RV_AN_Brand <> 'PediaSure Peptide' --not on shelf product; specialty 
+)  
+
+/**************************************************************************************************************************************/
+
+--D.                                             Calculate AO Food
+
+/**************************************************************************************************************************************/
+
+,
+Total_Food_ITN
+as
+(select t.UPC, t.Period_Desc, t.Market_Desc
+    , t.UPC_Sales - k.Dollars as UPC_Sales
+    , t.UPC_Units - k.Units as UPC_Units
+    , t.UPC_EQ - k.EQ as UPC_EQ
+from UPC_Sales_ITN t
+    join Kroger k 
+        on t.UPC = k.UPC
+        and t.Period_Desc = k.Period_Desc
+where t.Market_Desc = 'Total US Food'
+)
+,
+
+Food_Retailers_ITN
+as
+(select UPC, Period_Desc, 'Food_Retailers' as Market_Desc_x
+    , sum(UPC_Sales) as UPC_Sales
+    , sum(UPC_Units) as UPC_Units
+    , sum(UPC_EQ) as UPC_EQ
+from UPC_Sales_ITN
+where market_desc IN ('Ahold USA Corp Total TA', 'ALBSCO Total Company TA', 'Meijer Total TA', 'Publix Total TA') --Food Markets + Kroger
+group by UPC, Period_Desc
+)
+,
+
+--#D1. UPC in Total US Food only and not in other Food Retailers including Kroger
+Calc_AO_Food_ITN 
+as
+(select i.UPC, i.Period_Desc, case when i.Market_Desc = 'Total US Food' then 'AO Food' end as Market_Desc
+    , case when i.Dollars is null or i.Dollars = '' then 0 else convert(decimal(15,2), i.Dollars) end as Total_Sales
+    , case when i.Units is null or i.Units = '' then 0 else convert(decimal(15,2), i.Units) end as Total_Units
+    , case when i.EQ is null or i.EQ = '' then 0 else convert(decimal(15,2), i.EQ) end as Total_EQ 
+from mitest.T_Niel_Extract_UPC_ITN i
+    left join mitest.T_Niel_Extract_UPC_ITN i2
+        on i.UPC = i2.UPC
+        and i.Period_Desc = i2.Period_Desc
+        and i.DB = i2.DB
+        and i.ABT_Segment = i2.ABT_Segment
+        and i.ABT_Subsegment = i2.ABT_Subsegment
+        and i.ABT_Manufacturer = i2.ABT_Manufacturer
+        and i.ABT_Brand = i2.ABT_Brand
+        and i.ABT_Subbrand = i2.ABT_Subbrand
+        and i.ABT_Form = i2.ABT_Form
+        and i.ABT_Flavor = i2.ABT_Flavor
+        and i.ABT_Count_Size = i2.ABT_Count_Size
+        and i.ABT_Pack_Size = i2.ABT_Pack_Size
+        and i.ABT_Size_Range = i2.ABT_Size_Range
+        and i.ABT_Formula_Reb_NonReb = i2.ABT_Formula_Reb_NonReb
+        and i.ABT_Formula_Subty = i2.ABT_Formula_Subty
+        and i.ABT_Formula_Ty = i2.ABT_Formula_Ty
+        and i2.Market_Desc IN ('Ahold USA Corp Total TA', 'ALBSCO Total Company TA', 'Meijer Total TA', 'Publix Total TA') --Food Markets + Kroger
+    left join (select Market_Desc,Period_Desc,UPC,Dollars,Units,EQ
+               from Kroger
+              ) as K
+                    on i.UPC = K.UPC
+                    and i.Period_Desc = K.Period_Desc
+where i.Market_Desc = 'Total US Food'
+    and i2.UPC is null
+    and K.UPC is null
+group by i.UPC, i.Period_Desc, case when i.Market_Desc = 'Total US Food' then 'AO Food' end, i.Dollars, i.Units, i.EQ, k.Dollars, k.Units, k.EQ    
+)
+,
+
+--#D2. Calculating Remaining AO Food by subtracting all Food Retailers incl. Kroger sales from Total US Food  
+Calc_AO_Food_ITN2 
+as
+(select i.UPC, i.Period_Desc, case when i.Market_Desc = 'Total US Food' then 'AO Food' end as Market_Desc 
+    , case when i.Dollars is null or i.Dollars = '' then 0 else convert(decimal(15,2), i.Dollars) end - i2.Dollars 
+        - case when K.Dollars is null then 0 else K.Dollars end as Total_Sales
+    , case when i.Units is null or i.Units = '' then 0 else convert(decimal(15,2), i.Units) end - i2.Units 
+        - case when K.Units is null then 0 else K.Units end as Total_Units
+    , case when i.EQ is null or i.EQ = '' then 0 else convert(decimal(15,2), i.EQ) end - i2.EQ 
+        - case when K.EQ is null then 0 else K.EQ end as Total_EQ
+from mitest.T_Niel_Extract_UPC_ITN i  
+    join (select UPC, Period_Desc
+            , sum(convert(decimal(15,2), Dollars)) as Dollars
+            , sum(convert(decimal(15,2), Units)) as Units
+            , sum(convert(decimal(15,2), EQ)) as EQ
+          from mitest.T_Niel_Extract_UPC_ITN
+          where Market_Desc IN ('Ahold USA Corp Total TA', 'ALBSCO Total Company TA', 'Meijer Total TA', 'Publix Total TA') --= Food Markets + Kroger
+          group by UPC, Period_Desc
+          ) as i2
+                on i.UPC = i2.UPC
+                and i.Period_Desc = i2.Period_Desc
+    left join (select Market_Desc,Period_Desc,UPC,Dollars,Units,EQ
+               from Kroger
+              ) as K
+                    on i.UPC = K.UPC
+                    and i.Period_Desc = K.Period_Desc
+where i.Market_Desc = 'Total US Food'
+group by i.UPC, i.Period_Desc, case when i.Market_Desc = 'Total US Food' then 'AO Food' end , i.Dollars, i2.Dollars, i.Units, i2.Units, i.EQ, i2.EQ, k.Dollars, k.Units, k.EQ
+--having case when i.Dollars is null or i.Dollars = '' then 0 else convert(decimal(15,2), i.Dollars) end - i2.Dollars > 1
+)
+,
+
+--#D3.  Calculating AO Food for Kroger UPCs not in Nielsen's UPC file but have Item Characteristics grouping match to Nielsen's Total US Food
+Calc_AO_Food_ITN3 
+as
+(select i.UPC, i.Period_Desc, case when i.Market_Desc = 'Total US Food' then 'AO Food' end as Market_Desc 
+    , case when i.Dollars is null or i.Dollars = '' then 0 else convert(decimal(15,2), i.Dollars) end 
+        - case when K.Dollars is null then 0 else K.Dollars end as Total_Sales
+    , case when i.Units is null or i.Units = '' then 0 else convert(decimal(15,2), i.Units) end 
+        - case when K.Units is null then 0 else K.Units end as Total_Units
+    , case when i.EQ is null or i.EQ = '' then 0 else convert(decimal(15,2), i.EQ) end 
+        - case when K.EQ is null then 0 else K.EQ end as Total_EQ
+from mitest.T_Niel_Extract_UPC_ITN i  
+    left join (select UPC, Period_Desc
+              from mitest.T_Niel_Extract_UPC_ITN
+              where Market_Desc IN ('Ahold USA Corp Total TA', 'ALBSCO Total Company TA', 'Meijer Total TA', 'Publix Total TA') --= Food Markets + Kroger
+              group by UPC, Period_Desc
+              ) as i2
+                on i.UPC = i2.UPC
+                and i.Period_Desc = i2.Period_Desc
+    join (select Market_Desc,Period_Desc,UPC,Dollars,Units,EQ
+               from Kroger
+              ) as K
+                    on i.UPC = K.UPC
+                    and i.Period_Desc = K.Period_Desc
+where i.Market_Desc = 'Total US Food'
+    and i2.UPC is null --UPC is only found in Total US Food and not in Food Retailer
+group by i.UPC, i.Period_Desc, case when i.Market_Desc = 'Total US Food' then 'AO Food' end , i.Dollars, i.Units, i.EQ, k.Dollars, k.Units, k.EQ
+--having case when i.Dollars is null or i.Dollars = '' then 0 else convert(decimal(15,2), i.Dollars) end  > 1
+)
+,
+
+Total_Food_LN
+as
+(select t.UPC, t.Period_Desc, t.Market_Desc
+    , t.UPC_Sales - k.Dollars as UPC_Sales
+    , t.UPC_Units - k.Units as UPC_Units
+    , t.UPC_EQ - k.EQ as UPC_EQ
+from UPC_Sales_LN t
+    join Kroger k 
+        on t.UPC = k.UPC
+        and t.Period_Desc = k.Period_Desc
+where t.Market_Desc = 'Total US Food'
+)
+,
+
+Food_Retailers_LN
+as
+(select UPC, Period_Desc, 'Food_Retailers' as Market_Desc_x
+    , sum(UPC_Sales) as UPC_Sales
+    , sum(UPC_Units) as UPC_Units
+    , sum(UPC_EQ) as UPC_EQ
+from UPC_Sales_LN
+where market_desc IN ('Ahold USA Corp Total TA', 'ALBSCO Total Company TA', 'Meijer Total TA', 'Publix Total TA') --Food Markets + Kroger
+group by UPC, Period_Desc
+)
+,
+
+--#D4. --UPC in Total US Food only and not in other Food Retailers including Kroger 
+Calc_AO_Food_LN 
+as
+(select l.UPC, l.Period_Desc, case when l.Market_Desc = 'Total US Food' then 'AO Food' end as Market_Desc
+    , case when l.Dollars is null or l.Dollars = '' then 0 else convert(decimal(15,2), l.Dollars) end as Total_Sales
+    , case when l.Units is null or l.Units = '' then 0 else convert(decimal(15,2), l.Units) end as Total_Units
+    , case when l.EQ is null or l.EQ = '' then 0 else convert(decimal(15,2), l.EQ) end as Total_EQ
+from mitest.T_Niel_Extract_UPC_LN l
+    left join mitest.T_Niel_Extract_UPC_LN l2
+        on l.UPC = l2.UPC
+        and l.Period_Desc = l2.Period_Desc
+        and l.DB = l2.DB
+        and l.ABT_Segment = l2.ABT_Segment
+        and l.ABT_Subsegment = l2.ABT_Subsegment
+        and l.ABT_Manufacturer = l2.ABT_Manufacturer
+        and l.ABT_Brand = l2.ABT_Brand
+        and l.ABT_Subbrand = l2.ABT_Subbrand
+        and l.ABT_Form = l2.ABT_Form
+        and l.ABT_Flavor = l2.ABT_Flavor
+        and l.ABT_Count_Size = l2.ABT_Count_Size
+        and l2.Market_Desc IN ('Ahold USA Corp Total TA', 'ALBSCO Total Company TA', 'Meijer Total TA', 'Publix Total TA') --Food Markets + Kroger
+    left join (select Market_Desc,Period_Desc,UPC,Dollars,Units,EQ
+               from Kroger
+              ) as K
+                    on l.UPC = K.UPC
+                    and l.Period_Desc = K.Period_Desc
+where l.Market_Desc = 'Total US Food'
+    and l2.UPC is null
+    and k.UPC is null
+group by l.UPC, l.Period_Desc, case when l.Market_Desc = 'Total US Food' then 'AO Food' end, l.Dollars, l.Units, l.EQ 
+)
+,
+
+--#D5.  Calculating Remaining AO Food by subtracting all Food Retailers incl. Kroger sales from Total US Food
+Calc_AO_Food_LN2   
+as
+(select i.UPC, i.Period_Desc, case when i.Market_Desc = 'Total US Food' then 'AO Food' end as Market_Desc 
+    , case when i.Dollars is null or i.Dollars = '' then 0 else convert(decimal(15,2), i.Dollars) end - i2.Dollars 
+        - case when K.Dollars is null then 0 else K.Dollars end as Total_Sales
+    , case when i.Units is null or i.Units = '' then 0 else convert(decimal(15,2), i.Units) end - i2.Units 
+        - case when K.Units is null then 0 else K.Units end as Total_Units
+    , case when i.EQ is null or i.EQ = '' then 0 else convert(decimal(15,2), i.EQ) end - i2.EQ 
+        - case when K.EQ is null then 0 else K.EQ end as Total_EQ
+from mitest.T_Niel_Extract_UPC_LN i  
+    join (select UPC, Period_Desc
+            , sum(convert(decimal(15,2), Dollars)) as Dollars
+            , sum(convert(decimal(15,2), Units)) as Units
+            , sum(convert(decimal(15,2), EQ)) as EQ
+          from mitest.T_Niel_Extract_UPC_LN
+          where Market_Desc IN ('Ahold USA Corp Total TA', 'ALBSCO Total Company TA', 'Meijer Total TA', 'Publix Total TA') --Food Markets + Kroger
+          group by UPC, Period_Desc
+          ) as i2
+                on i.UPC = i2.UPC
+                and i.Period_Desc = i2.Period_Desc
+    left join (select Market_Desc,Period_Desc,UPC,Dollars,Units,EQ
+               from Kroger
+              ) as K
+                    on i.UPC = K.UPC
+                    and i.Period_Desc = K.Period_Desc
+where i.Market_Desc = 'Total US Food'
+group by i.UPC, i.Period_Desc, case when i.Market_Desc = 'Total US Food' then 'AO Food' end , i.Dollars, i2.Dollars, i.Units, i2.Units, i.EQ, i2.EQ, k.Dollars, k.Units, k.EQ
+--having case when i.Dollars is null or i.Dollars = '' then 0 else convert(decimal(15,2), i.Dollars) end - i2.Dollars > 1
+)
+,
+
+--#D6.  Calculating AO Food for Kroger UPCs not in Nielsen's UPC file but have Item Characteristics grouping match to Nielsen's Total US Food
+Calc_AO_Food_LN3 
+as
+(select i.UPC, i.Period_Desc, case when i.Market_Desc = 'Total US Food' then 'AO Food' end as Market_Desc 
+    , case when i.Dollars is null or i.Dollars = '' then 0 else convert(decimal(15,2), i.Dollars) end  
+        - case when K.Dollars is null then 0 else K.Dollars end as Total_Sales
+    , case when i.Units is null or i.Units = '' then 0 else convert(decimal(15,2), i.Units) end  
+        - case when K.Units is null then 0 else K.Units end as Total_Units
+    , case when i.EQ is null or i.EQ = '' then 0 else convert(decimal(15,2), i.EQ) end  
+        - case when K.EQ is null then 0 else K.EQ end as Total_EQ
+from mitest.T_Niel_Extract_UPC_LN i  
+    left join (select UPC, Period_Desc
+              from mitest.T_Niel_Extract_UPC_LN
+              where Market_Desc IN ('Ahold USA Corp Total TA', 'ALBSCO Total Company TA', 'Meijer Total TA', 'Publix Total TA') --Food Markets + Kroger
+              group by UPC, Period_Desc
+              ) as i2
+                on i.UPC = i2.UPC
+                and i.Period_Desc = i2.Period_Desc
+    join (select Market_Desc,Period_Desc,UPC,Dollars,Units,EQ
+               from Kroger
+              ) as K
+                    on i.UPC = K.UPC
+                    and i.Period_Desc = K.Period_Desc
+where i.Market_Desc = 'Total US Food'
+    and i2.UPC is null --UPC is only found in Total US Food and not in Food Retailer
+group by i.UPC, i.Period_Desc, case when i.Market_Desc = 'Total US Food' then 'AO Food' end , i.Dollars, i.Units, i.EQ, k.Dollars, k.Units, k.EQ
+--having case when i.Dollars is null or i.Dollars = '' then 0 else convert(decimal(15,2), i.Dollars) end  > 1
+)
+
+/**************************************************************************************************************************************/
+
+--E.                                            Calculate AO Drug
+
+/**************************************************************************************************************************************/
+
+,
+Total_Drug_ITN
+as
+(select t.UPC, t.Period_Desc, t.Market_Desc
+    , t.UPC_Sales as UPC_Sales
+    , t.UPC_Units as UPC_Units
+    , t.UPC_EQ as UPC_EQ
+from UPC_Sales_ITN t
+where t.Market_Desc = 'Total US Drug'
+)
+,
+
+Drug_Retailers_ITN
+as
+(select UPC, Period_Desc, 'Drug_Retailers' as Market_Desc_x
+    , sum(UPC_Sales) as UPC_Sales
+    , sum(UPC_Units) as UPC_Units
+    , sum(UPC_EQ) as UPC_EQ
+from UPC_Sales_ITN
+where market_desc IN ('CVS Total Corp WO HI TA', 'Wags/Rite Aid Corp Total TA', 'Rite Aid - Corp Total TA') --Drug Markets
+group by UPC, Period_Desc
+)
+,
+
+--E1. UPC in Total US Drug only and not in other Drug Retailers 
+Calc_AO_Drug_ITN 
+as
+(select i.UPC, i.Period_Desc, case when i.Market_Desc = 'Total US Drug' then 'AO Drug' end as Market_Desc
+    , case when i.Dollars is null or i.Dollars = '' then 0 else convert(decimal(15,2), i.Dollars) end as Total_Sales
+    , case when i.Units is null or i.Units = '' then 0 else convert(decimal(15,2), i.Units) end as Total_Units
+    , case when i.EQ is null or i.EQ = '' then 0 else convert(decimal(15,2), i.EQ) end as Total_EQ 
+from mitest.T_Niel_Extract_UPC_ITN i
+    left join mitest.T_Niel_Extract_UPC_ITN i2
+        on i.UPC = i2.UPC
+        and i.Period_Desc = i2.Period_Desc
+        and i.DB = i2.DB
+        and i.ABT_Segment = i2.ABT_Segment
+        and i.ABT_Subsegment = i2.ABT_Subsegment
+        and i.ABT_Manufacturer = i2.ABT_Manufacturer
+        and i.ABT_Brand = i2.ABT_Brand
+        and i.ABT_Subbrand = i2.ABT_Subbrand
+        and i.ABT_Form = i2.ABT_Form
+        and i.ABT_Flavor = i2.ABT_Flavor
+        and i.ABT_Count_Size = i2.ABT_Count_Size
+        and i.ABT_Pack_Size = i2.ABT_Pack_Size
+        and i.ABT_Size_Range = i2.ABT_Size_Range
+        and i.ABT_Formula_Reb_NonReb = i2.ABT_Formula_Reb_NonReb
+        and i.ABT_Formula_Subty = i2.ABT_Formula_Subty
+        and i.ABT_Formula_Ty = i2.ABT_Formula_Ty
+        and i2.Market_Desc IN ('CVS Total Corp WO HI TA', 'Wags/Rite Aid Corp Total TA', 'Rite Aid - Corp Total TA') --Drug Markets
+        and i2.Dollars > '0' --ignore 0 Dollar sales
+where i.Market_Desc = 'Total US Drug'
+    and i2.UPC is null --UPC is only found in Total US Drug and not in Drug Retailer
+group by i.UPC, i.Period_Desc, case when i.Market_Desc = 'Total US Drug' then 'AO Drug' end, i.Dollars, i.Units, i.EQ    
+)
+,
+
+--E2.  Calculating Remaining AO Drug by subtracting Drug Retailers' sales from Total US Drug
+Calc_AO_Drug_ITN2  
+as
+(select i.UPC, i.Period_Desc, case when i.Market_Desc = 'Total US Drug' then 'AO Drug' end as Market_Desc 
+    , case when i.Dollars is null or i.Dollars = '' then 0 else convert(decimal(15,2), i.Dollars) end - i2.Dollars as Total_Sales
+    , case when i.Units is null or i.Units = '' then 0 else convert(decimal(15,2), i.Units) end - i2.Units as Total_Units
+    , case when i.EQ is null or i.EQ = '' then 0 else convert(decimal(15,2), i.EQ) end - i2.EQ as Total_EQ
+from mitest.T_Niel_Extract_UPC_ITN i  
+    join (select UPC, Period_Desc
+            , sum(convert(decimal(15,2), Dollars)) as Dollars
+            , sum(convert(decimal(15,2), Units)) as Units
+            , sum(convert(decimal(15,2), EQ)) as EQ
+          from mitest.T_Niel_Extract_UPC_ITN
+          where Market_Desc IN ('CVS Total Corp WO HI TA', 'Wags/Rite Aid Corp Total TA', 'Rite Aid - Corp Total TA') --Drug Markets
+          group by UPC, Period_Desc
+          ) as i2
+                on i.UPC = i2.UPC
+                and i.Period_Desc = i2.Period_Desc
+where i.Market_Desc = 'Total US Drug'
+group by i.UPC, i.Period_Desc, case when i.Market_Desc = 'Total US Drug' then 'AO Drug' end , i.Dollars, i2.Dollars, i.Units, i2.Units, i.EQ, i2.EQ
+--having case when i.Dollars is null or i.Dollars = '' then 0 else convert(decimal(15,2), i.Dollars) end - i2.Dollars > 1
+)
+,
+
+Total_Drug_LN
+as
+(select t.UPC, t.Period_Desc, t.Market_Desc
+    , t.UPC_Sales as UPC_Sales
+    , t.UPC_Units as UPC_Units
+    , t.UPC_EQ as UPC_EQ
+from UPC_Sales_LN t
+where t.Market_Desc = 'Total US Drug'
+)
+,
+
+Drug_Retailers_LN
+as
+(select UPC, Period_Desc, 'Drug_Retailers' as Market_Desc_x
+    , sum(UPC_Sales) as UPC_Sales
+    , sum(UPC_Units) as UPC_Units
+    , sum(UPC_EQ) as UPC_EQ
+from UPC_Sales_LN
+where market_desc IN ('CVS Total Corp WO HI TA', 'Wags/Rite Aid Corp Total TA', 'Rite Aid - Corp Total TA') --Drug Markets
+group by UPC, Period_Desc
+)
+,
+
+--E3.  UPC in Total US Drug only and not in other Drug Retailers  
+Calc_AO_Drug_LN 
+as
+(select l.UPC, l.Period_Desc, case when l.Market_Desc = 'Total US Drug' then 'AO Drug' end as Market_Desc
+    , case when l.Dollars is null or l.Dollars = '' then 0 else convert(decimal(15,2), l.Dollars) end as Total_Sales
+    , case when l.Units is null or l.Units = '' then 0 else convert(decimal(15,2), l.Units) end as Total_Units
+    , case when l.EQ is null or l.EQ = '' then 0 else convert(decimal(15,2), l.EQ) end as Total_EQ
+from mitest.T_Niel_Extract_UPC_LN l
+    left join mitest.T_Niel_Extract_UPC_LN l2
+        on l.UPC = l2.UPC
+        and l.Period_Desc = l2.Period_Desc
+        and l.DB = l2.DB
+        and l.ABT_Segment = l2.ABT_Segment
+        and l.ABT_Subsegment = l2.ABT_Subsegment
+        and l.ABT_Manufacturer = l2.ABT_Manufacturer
+        and l.ABT_Brand = l2.ABT_Brand
+        and l.ABT_Subbrand = l2.ABT_Subbrand
+        and l.ABT_Form = l2.ABT_Form
+        and l.ABT_Flavor = l2.ABT_Flavor
+        and l.ABT_Count_Size = l2.ABT_Count_Size
+        and l2.Market_Desc IN ('CVS Total Corp WO HI TA', 'Wags/Rite Aid Corp Total TA', 'Rite Aid - Corp Total TA') --Drug Markets
+        and l2.Dollars > '0' --ignore 0 Dollar sales
+where l.Market_Desc = 'Total US Drug'
+    and l2.UPC is null --UPC is only found in Total US Drug and not in Drug Retailer
+    and l.ABT_FORM <> 'PUDDING' --Nielsen to remove from extracts soon
+group by l.UPC, l.Period_Desc, case when l.Market_Desc = 'Total US Drug' then 'AO Drug' end, l.Dollars, l.Units, l.EQ 
+)
+,
+
+--E4. Calculating Remaining AO Drug by subtracting Drug Retailers' sales from Total US Drug 
+Calc_AO_Drug_LN2  
+as
+(select i.UPC, i.Period_Desc, case when i.Market_Desc = 'Total US Drug' then 'AO Drug' end as Market_Desc 
+    , case when i.Dollars is null or i.Dollars = '' then 0 else convert(decimal(15,2), i.Dollars) end - i2.Dollars as Total_Sales
+    , case when i.Units is null or i.Units = '' then 0 else convert(decimal(15,2), i.Units) end - i2.Units as Total_Units
+    , case when i.EQ is null or i.EQ = '' then 0 else convert(decimal(15,2), i.EQ) end - i2.EQ as Total_EQ
+from mitest.T_Niel_Extract_UPC_LN i  
+    join (select UPC, Period_Desc
+            , sum(convert(decimal(15,2), Dollars)) as Dollars
+            , sum(convert(decimal(15,2), Units)) as Units
+            , sum(convert(decimal(15,2), EQ)) as EQ
+          from mitest.T_Niel_Extract_UPC_LN
+          where Market_Desc IN ('CVS Total Corp WO HI TA', 'Wags/Rite Aid Corp Total TA', 'Rite Aid - Corp Total TA') --Drug Markets
+          group by UPC, Period_Desc
+          ) as i2
+                on i.UPC = i2.UPC
+                and i.Period_Desc = i2.Period_Desc
+where i.Market_Desc = 'Total US Drug'
+    and i.ABT_FORM <> 'PUDDING' --Nielsen to remove from extracts soon
+group by i.UPC, i.Period_Desc, case when i.Market_Desc = 'Total US Drug' then 'AO Drug' end , i.Dollars, i2.Dollars, i.Units, i2.Units, i.EQ, i2.EQ
+--having case when i.Dollars is null or i.Dollars = '' then 0 else convert(decimal(15,2), i.Dollars) end - i2.Dollars > 1
+)
+
+/**************************************************************************************************************************************/
+
+--F.                                            Calculate AO Market
+--                                           Sim.com and Enf.com sales
+
+/**************************************************************************************************************************************/
+
+--F1.
+
+
+
+
+
+/**************************************************************************************************************************************/
+
+--G.                               Load Nielsen Facts (excl. Target) mitest.T_Consumption
+--                           This is not read by Nielsen.  However, we use it to calculate Target AO
+
+/**************************************************************************************************************************************/
+
+INSERT INTO mitest.T_Consumption (UPC, [Period Description], [Market Description], [$], Units, EQ) --Main Consumption Table
+
+select *
+from UPC_Sales_LN  --current 9 weeks
+where Market_Desc <> 'Target Total Enterprise TA' 
+
+union
+
+select *
+from UPC_Sales_ITN  --current 9 weeks
+where Market_Desc <> 'Target Total Enterprise TA' 
+
+union 
+
+/**************************************************************************************************************************************/
+
+--H.                                            Calculate & Load Target AO
+
+/**************************************************************************************************************************************/
+
+select i.UPC, i.Period_Desc, 'Target AO' as Market_Desc
+    , i.UPC_Sales - case when i2.UPC_Sales is null then 0 else i2.UPC_Sales end as UPC_Sales
+    , i.UPC_Units - i2.UPC_Units as UPC_Units
+    , i.UPC_EQ - i2.UPC_EQ as UPC_EQ
+from UPC_Sales_ITN i
+    left join UPC_Sales_ITN i2
+        on i.UPC = i2.UPC
+        and i.Period_Desc = i2.Period_Desc
+        and i2.Market_Desc = 'Target Total BM/FF TA'
+where i.Market_Desc = 'Target Total Enterprise TA' 
+   
+
+union
+
+select l.UPC, l.Period_Desc, 'Target AO' as Market_Desc
+    , l.UPC_Sales - case when l2.UPC_Sales is null then 0 else l2.UPC_Sales end as UPC_Sales
+    , l.UPC_Units - l2.UPC_Units as UPC_Units
+    , l.UPC_EQ - l2.UPC_EQ as UPC_EQ
+from UPC_Sales_LN l
+    left join UPC_Sales_LN l2
+        on l.UPC = l2.UPC
+        and l.Period_Desc = l2.Period_Desc
+        and l2.Market_Desc = 'Target Total BM/FF TA'
+where l.Market_Desc = 'Target Total Enterprise TA' 
+    
+
+union
+
+/**************************************************************************************************************************************/
+
+--I.                            ONLY NEEDED (ONE-TIME) GO-LIVE, THEN COMMENT OUT THIS SECTION
+
+/**************************************************************************************************************************************/
+
+/*
+select 	C.UPC
+		,C.[Period Description]
+		,C.[Market Description]
+		,C.[$] AS UPC_Sales
+		,C.Units as UPC_Units
+		,C.EQ as UPC_EQ
+
+from 	mida_data.Consumption C
+
+where 	C.[Period Description] < (select min(Period_Desc) as Begin_Refresh_Dt from mitest.T_Niel_Extract_UPC_LN)
+
+union
+*/
+
+/**************************************************************************************************************************************/
+
+--J.                                    Continue Loading mitest.T_Consumption
+
+/**************************************************************************************************************************************/
+
+--J1.  Insert Generics
+select GenericUPC, Period_Desc, Market_Desc, Generic_Sales, Generic_Units, Generic_EQ 
+from LN_Generics
+where Generic_Sales > 0 --ensures only suppressed UPCs are picked up and not Private Label
+
+union
+
+select GenericUPC, Period_Desc, Market_Desc, Generic_Sales, Generic_Units, Generic_EQ
+from ITN_Generics
+where Generic_Sales > 0 --ensures only suppressed UPCs are picked up and not Private Label
+
+union
+
+--J2.  Insert Amazon
+select UPC, Period_Desc, Market_Desc, sum(Dollars) as Dollars, sum(Units) as Units, sum(EQ) as EQ
+from mitest.T_Amazon
+group by UPC, Period_Desc, Market_Desc
+
+union
+
+--J3.  Insert Kroger
+select UPC, Period_Desc, Market_Desc, Dollars, Units, EQ
+from Kroger
+
+union 
+
+--J4.  Insert Costco
+select UPC, [Period], Market, Dollars, Units, EQ
+from mida_data.Costco_TMC --ABT & Competitive
+where [Period] >= (select min(Period_Desc) as Begin_Refresh_Dt from mitest.T_Niel_Extract_UPC_LN)  --UPDATE to start of refresh period 
+
+union 
+
+--J5.  Insert AO Food
+select UPC, Period_Desc, Market_Desc, Total_Sales, Total_Units, Total_EQ
+from Calc_AO_Food_ITN
+
+union 
+
+select UPC, Period_Desc, Market_Desc, Total_Sales, Total_Units, Total_EQ
+from Calc_AO_Food_LN
+
+union 
+
+select UPC, Period_Desc, Market_Desc, Total_Sales, Total_Units, Total_EQ
+from Calc_AO_Food_ITN2
+
+union 
+
+select UPC, Period_Desc, Market_Desc, Total_Sales, Total_Units, Total_EQ
+from Calc_AO_Food_LN2
+
+union 
+
+select UPC, Period_Desc, Market_Desc, Total_Sales, Total_Units, Total_EQ
+from Calc_AO_Food_ITN3
+
+union 
+
+select UPC, Period_Desc, Market_Desc, Total_Sales, Total_Units, Total_EQ
+from Calc_AO_Food_LN3
+
+union 
+
+--J6.  Insert AO Drug
+select UPC, Period_Desc, Market_Desc, Total_Sales, Total_Units, Total_EQ
+from Calc_AO_Drug_ITN
+
+union 
+
+select UPC, Period_Desc, Market_Desc, Total_Sales, Total_Units, Total_EQ
+from Calc_AO_Drug_LN
+
+union 
+
+select UPC, Period_Desc, Market_Desc, Total_Sales, Total_Units, Total_EQ
+from Calc_AO_Drug_ITN2
+
+union 
+
+select UPC, Period_Desc, Market_Desc, Total_Sales, Total_Units, Total_EQ
+from Calc_AO_Drug_LN2
+
+
+union 
+
+select w.UPC, w.Period_Desc, w.Market_Desc, w.Dollars, w.Units, w.EQ
+from mitest.T_WIC_Direct w
+    join Kroger K
+        on w.Period_Desc = k.Period_Desc --constraints the periods to current refresh period
+;
+
+/**************************************************************************************************************************************/
+
+--K.                                             Build & Load Military Market
+
+/**************************************************************************************************************************************/
+
+--K1.  Insert Military Market
+                                    --Step 1 - Aggregate facts into Military
+INSERT INTO mitest.T_Market_Groups (UPC, [Period Description], [Market Description], [$], Units, EQ)
+
+select upc, [Period Description], case when [Market Description] IN ('AAFES Total CONUS TA', 'Coast Guard Total CONUS TA', 'Marine Corp Total CONUS TA'
+    , 'Total DeCA CONUS ex AK & HI TA', 'NEXCOM Total CONUS TA') then 'Military' else [Market Description] end as Market_Desc_new
+    , sum([$]) as Dollars, sum(Units) as Units, sum(EQ) as EQ
+from mitest.T_Consumption
+where [Market Description] IN ('AAFES Total CONUS TA', 'Coast Guard Total CONUS TA', 'Marine Corp Total CONUS TA'
+    , 'Total DeCA CONUS ex AK & HI TA', 'NEXCOM Total CONUS TA')
+group by case when [Market Description] IN ('AAFES Total CONUS TA', 'Coast Guard Total CONUS TA', 'Marine Corp Total CONUS TA'
+    , 'Total DeCA CONUS ex AK & HI TA', 'NEXCOM Total CONUS TA') then 'Military' else [Market Description] end, [Period Description], upc;
+
+                    --Step 2 - Insert aggregate records into Consumption Table & then delete non-aggregated rows
+INSERT INTO mitest.T_Consumption (UPC, [Period Description], [Market Description], [$], Units, EQ)
+select UPC, [Period Description], [Market Description], [$], Units, EQ from mitest.T_Market_Groups;
+
+DELETE FROM mitest.T_Consumption WHERE [Market Description] IN ('AAFES Total CONUS TA', 'Coast Guard Total CONUS TA', 'Marine Corp Total CONUS TA'
+    , 'Total DeCA CONUS ex AK & HI TA', 'NEXCOM Total CONUS TA');
+
+                                    --Step 3 - Clearout records in functioning Temp table
+delete mitest.T_Market_Groups; 
+
+/**************************************************************************************************************************************/
+
+--L.                                        Build & Load Nielsen Ecom Market
+
+/**************************************************************************************************************************************/
+
+--L1.  Insert Nielsen Ecom
+                                --Step 1 - Aggregate facts into Nielsen Ecom
+INSERT INTO mitest.T_Market_Groups (UPC, [Period Description], [Market Description], [$], Units, EQ)
+
+select upc, [Period Description], case when [Market Description] IN ('Giant Eagle Total Ecom TA', 'Peapod Total Ecom TA', 'Rite Aid - Total Ecom TA')
+                              then 'Nielsen Ecom' else [Market Description] 
+                         end as Market_Desc_new
+    , sum([$]) as Dollars, sum(Units) as Units, sum(EQ) as EQ
+from mitest.T_Consumption
+where [Market Description] IN ('Giant Eagle Total Ecom TA', 'Peapod Total Ecom TA', 'Rite Aid - Total Ecom TA')
+group by case when [Market Description] IN ('Giant Eagle Total Ecom TA', 'Peapod Total Ecom TA', 'Rite Aid - Total Ecom TA') 
+                then 'Nielsen Ecom' else [Market Description] 
+         end, [Period Description], upc;
+
+                    --Step 2 - Insert aggregate records into Consumption Table & then delete non-aggregated rows
+INSERT INTO mitest.T_Consumption (UPC, [Period Description], [Market Description], [$], Units, EQ)
+select UPC, [Period Description], [Market Description], [$], Units, EQ from mitest.T_Market_Groups;
+
+DELETE FROM mitest.T_Consumption WHERE [Market Description] IN ('Giant Eagle Total Ecom TA', 'Peapod Total Ecom TA', 'Rite Aid - Total Ecom TA');
+
+                                    --Step 3 - Clearout records in functioning Temp table
+DELETE mitest.T_Market_Groups; 
+
+
+/**************************************************************************************************************************************/
+
+--M.                               Insert Restatement, Plug, Corrections, Overrides to Facts
+
+/**************************************************************************************************************************************/
+
+
+--M1.                                    Remove UPC/Period/Market that will be adjusted
+
+DELETE mitest.T_Consumption 
+    FROM mitest.T_Consumption 
+    JOIN mitest.T_Overrides_and_Plugs ON mitest.T_Consumption.UPC = mitest.T_Overrides_and_Plugs.UPC
+WHERE mitest.T_Consumption.[Period Description] = mitest.T_Overrides_and_Plugs.[Period Description]
+     AND mitest.T_Consumption.[Market Description] = mitest.T_Overrides_and_Plugs.[Market Description]
+
+--M2.                                                       Load Adjustments
+
+INSERT INTO mitest.T_Consumption (UPC, [Period Description], [Market Description], [$], Units, EQ)
+
+select	a.UPC, [Period Description], [Market Description], [$], Units, EQ 
+
+from 	 mitest.T_Overrides_and_Plugs a
+		,mida_data.Consumption_Char b
+
+where 	a.UPC = b.UPC;
+
+
+
+/**************************************************************************************************************************************/
+
+--N.                                                      Final Clean-up
+
+/**************************************************************************************************************************************/
+
+DELETE FROM mitest.T_Consumption WHERE [Market Description] IN ('Total US Drug', 'Total US xAOC', 'Total US Food');
+
+DELETE FROM mitest.T_Consumption WHERE [$] is null or [$] = 0;
+
+UPDATE mitest.T_Consumption
+SET [Market Description] = 'Ahold' WHERE [Market Description] = 'Ahold USA Corp Total TA';
+UPDATE mitest.T_Consumption
+SET [Market Description] = 'Alb/Safeway' WHERE [Market Description] = 'ALBSCO Total Company TA';
+UPDATE mitest.T_Consumption
+SET [Market Description] = 'BJ''s' WHERE [Market Description] = 'BJs Total TA';
+UPDATE mitest.T_Consumption
+SET [Market Description] = 'CVS' WHERE [Market Description] = 'CVS Total Corp WO HI TA';
+UPDATE mitest.T_Consumption
+SET [Market Description] = 'Dol Gen' WHERE [Market Description] = 'Dol Gen Total TA';
+UPDATE mitest.T_Consumption
+SET [Market Description] = 'Family Dol' WHERE [Market Description] = 'Family Dollar Total TA';
+UPDATE mitest.T_Consumption
+SET [Market Description] = 'Publix' WHERE [Market Description] = 'Publix Total TA';
+UPDATE mitest.T_Consumption
+SET [Market Description] = 'Rite Aid' WHERE [Market Description] = 'Rite Aid - Corp Total TA';
+UPDATE mitest.T_Consumption
+SET [Market Description] = 'Sam''s' WHERE [Market Description] = 'Sam''s Total TA';
+UPDATE mitest.T_Consumption
+SET [Market Description] = 'Target' WHERE [Market Description] = 'Target Total BM/FF TA';
+UPDATE mitest.T_Consumption
+SET [Market Description] = 'Walgreens' WHERE [Market Description] = 'Wags/Rite Aid Corp Total TA';
+UPDATE mitest.T_Consumption
+SET [Market Description] = 'Walmart' WHERE [Market Description] = 'Walmart Total US 2022 TA';
+UPDATE mitest.T_Consumption
+SET [Market Description] = 'Meijer' WHERE [Market Description] = 'Meijer Total TA';
+
+/**************************************************************************************************************************************/
+
+--                                                          THE END
+
+/**************************************************************************************************************************************/
+
+
+
+
+/**************************************************************************************************************************************/
+
+--                                                          PUBLISH TO PRODUCTION - mida_data
+--Run this after we've validated that everything is ready to publish to the "production" tables!
+/**************************************************************************************************************************************/
+
+/*
+
+DROP TABLE IF EXISTS mida_data.Consumption;
+DROP TABLE IF EXISTS mida_data.Consumption_Char;
+DROP TABLE IF EXISTS mida_data.Consumption_Nielsen_Char;
+DROP TABLE IF EXISTS mida_data.Consumption_UPC_AN_ITEM;
+DROP TABLE IF EXISTS mida_data.Consumption_UPC_ASIN;
+
+delete from mida_data.Archive_Consumption where PublishedDate <= DATEADD(month, -2, GETDATE());
+delete from mida_data.Archive_Consumption_Char where PublishedDate <= DATEADD(month, -2, GETDATE());
+
+insert into mida_data.Archive_Consumption
+select a.*, CURRENT_TIMESTAMP as PublishedDate
+from mitest.T_Consumption a;
+
+insert into mida_data.Archive_Consumption_Char
+select a.*, CURRENT_TIMESTAMP as PublishedDate
+from mitest.T_Consumption_Char a;
+
+
+select *
+into mida_data.Consumption
+from mitest.T_Consumption;
+
+select *
+into mida_data.Consumption_Char
+from mitest.T_Consumption_Char;
+
+select *
+into mida_data.Consumption_Nielsen_Char
+from mitest.T_Consumption_Nielsen_Char;
+
+select *
+into mida_data.Consumption_UPC_AN_ITEM
+from mitest.T_Consumption_UPC_AN_ITEM;
+
+select *
+into mida_data.Consumption_UPC_ASIN
+from mitest.T_Consumption_UPC_ASIN;
+
+
+*/

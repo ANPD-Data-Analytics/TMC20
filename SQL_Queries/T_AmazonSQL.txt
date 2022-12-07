@@ -1,0 +1,66 @@
+SELECT 	 'Amazon' as Market_Desc
+		,CONVERT(DATE, HW.WEEK_END_DATE) AS Period_Desc	
+		, case when IT.NIELSEN_SEGMENT IN ('IFUA', 'INFANT FORMULA UA') and IT.NIELSEN_ABT_REBATE = 'REBATED' and CI.CUST_ITEM_NBR like 'B%'	
+			then 'NON-REBATED' 	
+			else NIELSEN_ABT_REBATE	
+		 end as Rebate  --Rule4: When ASIN mapped to Rebated IFUA UPC for Amazon, then update status to NON-REBATED	
+		,IT.AN_ITEM_NBR	as AN_Item_Nbr
+		--3 Rules for selecting UPC or ASIN	
+		,case when IT.NIELSEN_SEGMENT IN ('IFUA', 'INFANT FORMULA UA') and IT.NIELSEN_ABT_REBATE = 'REBATED' and CI.CUST_ITEM_NBR like 'B%'	
+				then CI.CUST_ITEM_NBR	
+			  when CI.CUST_ITEM_NBR like 'B%' and IT.NIELSEN_UPC = '000000000000' 	
+				then CI.CUST_ITEM_NBR	
+			  when IT.NIELSEN_UPC <> '000000000000' 	
+				then IT.NIELSEN_UPC	
+		 end as UPC	
+		,CI.CUST_ITEM_NBR as Cust_Item_Nbr
+		,CI.U_SKU_UPC_RATIO	as SKU_UPC_Ratio
+		,IT.EQ_FACTOR as EQ_Factor
+		,IT.ABBOTT_PRODUCT	as Abbott_Prod
+		,ISNULL(SUM(HW.DOLLARS), 0) AS Dollars 	
+		,ISNULL(SUM(HW.UNITS), 0) AS Units	
+		,ISNULL(SUM(HW.EQ_UNITS), 0) AS EQ 	
+	   
+FROM 	 AbbottSandbox.dbo.vvHistoryWeek HW	
+		,AbbottSandbox.dbo.vvCustomerItem CI	
+		,AbbottSandbox.dbo.vvItem IT	
+		,AbbottSandbox.dbo.vvRetailer RT 
+     	
+WHERE HW.IDX_CUSTOMER_ITEM_CODE = CI.IDX_CUSTOMER_ITEM_CODE	
+    and IT.IDX_ITEM = CI.IDX_ITEM	
+    and HW.IDX_RETAILER = RT.IDX_RETAILER	
+    and HW.WEEK_END_DATE between 'MIN_WEEK_VARIABLE' and 'MAX_WEEK_VARIABLE'	
+    and RT.IDX_RETAILER IN ('71') --Amazon OCR (ABT and competitive)	
+    and IT.NIELSEN_SEGMENT IN ('BALANCED NUTRITION', 'DIABETES NUTRITION', 'TODDLER NUTRITION'
+								, 'ORAL ELECTROLYTES', 'INFANT FORMULA UA', 'IFUA', 'BN', 'DN'
+								, 'OES', 'TN')	
+
+GROUP BY HW.WEEK_END_DATE 
+		,IT.AN_ITEM_NBR 
+		,IT.NIELSEN_UPC 
+		,CI.CUST_ITEM_NBR 
+		,RT.RETAILER_NAME	
+		,IT.ABBOTT_PRODUCT 
+		,CI.U_SKU_UPC_RATIO 
+		,IT.EQ_FACTOR
+		,case when IT.NIELSEN_SEGMENT IN ('IFUA', 'INFANT FORMULA UA') and IT.NIELSEN_ABT_REBATE = 'REBATED' and CI.CUST_ITEM_NBR like 'B%'	
+				then CI.CUST_ITEM_NBR	
+			  when CI.CUST_ITEM_NBR like 'B%' and IT.NIELSEN_UPC = '000000000000' 	
+				then CI.CUST_ITEM_NBR	
+			  when IT.NIELSEN_UPC <> '000000000000' 	
+				then IT.NIELSEN_UPC	
+		 end
+		,case when IT.NIELSEN_SEGMENT IN ('IFUA', 'INFANT FORMULA UA') and IT.NIELSEN_ABT_REBATE = 'REBATED' and CI.CUST_ITEM_NBR like 'B%'	
+				then 'NON-REBATED' 	
+				else NIELSEN_ABT_REBATE	
+		 end	
+ 
+HAVING 	
+--20220301: CG: ADDING IN LOGIC TO REMOVE NEGATIVES IF THEY APPEAR IN DOLLARS UNITS OR EQ FROM WEEK END 2022-02-19 FORWARD 	
+    ISNULL(SUM(HW.DOLLARS), 0) > 0	
+    and ISNULL(SUM(HW.UNITS), 0) > 0	
+    and ISNULL(SUM(HW.EQ_UNITS), 0) > 0  	
+	
+ORDER BY RT.RETAILER_NAME
+		,IT.NIELSEN_UPC
+		,HW.WEEK_END_DATE;
