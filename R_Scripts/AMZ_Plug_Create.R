@@ -11,9 +11,6 @@ library(CommonFunctions)
 qrySandboxReturn <- CommonFunctions::qrySandboxReturn
 prevweekday <- CommonFunctions::prevweekday
 
-# Change Flag if L26 Week File is from the Plug Template ####
-FlgPlugOutput <- 1
-
 AMZ_LatestWeek <- "\\\\FCRPDFile02\\WRKStApps1$\\Retail Sales\\Power BI\\OCR Sandbox\\OCR Data\\"
 files <- list.files(path= AMZ_LatestWeek ,pattern="velocity_OCR Latest *",full.names = TRUE,recursive = TRUE)
 dirs <- dirname(files)
